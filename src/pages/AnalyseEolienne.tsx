@@ -38,6 +38,12 @@ const axisLabelProps = {
   textAnchor: "middle" as const,
 };
 
+const powerCurveGridProps = {
+  stroke: "hsl(var(--foreground))",
+  strokeOpacity: 0.18,
+  strokeDasharray: "4 4",
+};
+
 const weibullPdf = (v: number, k: number, c: number) => {
   if (v < 0 || k <= 0 || c <= 0) {
     return 0;
@@ -101,7 +107,7 @@ const ChartCard = ({
   </div>
 );
 
-const Analyse = () => {
+const AnalyseEolienne = () => {
   const [loaded, setLoaded] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisPayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -254,7 +260,7 @@ const Analyse = () => {
         <CheckCircle className="h-5 w-5 text-chart-2" />
         <div>
           <h2 className="font-display text-xl font-semibold text-foreground">
-            Analyse — donnees.txt
+            Analyse éolienne — donnees.txt
           </h2>
           <p className="text-sm text-muted-foreground">
             {currentData.kpis.totalMeasurements.toLocaleString()} mesures · {currentData.kpis.retainedMeasurements.toLocaleString()} retenues (status=1) · Script: main_louis.ipynb
@@ -356,14 +362,23 @@ const Analyse = () => {
           >
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={currentData.powerCurveData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid {...powerCurveGridProps} />
                 <XAxis dataKey="speed" label={{ value: "Vent [m/s]", position: "insideBottom", offset: -5, ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <YAxis label={{ value: "MW", angle: -90, position: "insideLeft", ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
                 <Legend verticalAlign="top" height={28} wrapperStyle={chartLegendStyle} />
-                <Area type="monotone" dataKey="q90" stackId="1" stroke="none" fill="hsl(var(--chart-1))" fillOpacity={0.1} name="Q90" />
-                <Area type="monotone" dataKey="q10" stackId="2" stroke="none" fill="hsl(var(--background))" fillOpacity={1} name="Q10" />
-                <Line type="monotone" dataKey="power" stroke="hsl(var(--chart-1))" strokeWidth={2.5} dot={false} name="Médiane" />
+                <Area type="monotone" dataKey="q90" stackId="1" stroke="none" fill="hsl(var(--chart-1))" fillOpacity={0.1} name="Q90" isAnimationActive={false} />
+                <Area type="monotone" dataKey="q10" stackId="2" stroke="none" fill="hsl(var(--background))" fillOpacity={1} name="Q10" isAnimationActive={false} />
+                <Line
+                  type="monotone"
+                  dataKey="power"
+                  stroke="hsl(var(--chart-1))"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name="Médiane"
+                  animationDuration={600}
+                  animationEasing="ease-out"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -515,4 +530,4 @@ const Analyse = () => {
   );
 };
 
-export default Analyse;
+export default AnalyseEolienne;

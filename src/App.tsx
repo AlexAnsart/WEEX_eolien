@@ -6,7 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Home from "@/pages/Home";
-import Analyse from "@/pages/Analyse";
+import AnalyseEolienne from "@/pages/AnalyseEolienne";
+import AnalyseMeteo from "@/pages/AnalyseMeteo";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,7 +23,8 @@ const App = () => (
           <main className="flex-1 flex flex-col">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/analyse" element={<Analyse />} />
+              <Route path="/analyse" element={<AnalyseEolienne />} />
+              <Route path="/analyse-meteo" element={<AnalyseMeteo />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>

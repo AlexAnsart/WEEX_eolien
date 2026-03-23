@@ -3,7 +3,8 @@ import { Wind } from "lucide-react";
 
 const links = [
   { to: "/", label: "Accueil" },
-  { to: "/analyse", label: "Analyse" },
+  { to: "/analyse", label: "Analyse éolienne" },
+  { to: "/analyse-meteo", label: "Analyse météo" },
 ];
 
 const Navbar = () => (

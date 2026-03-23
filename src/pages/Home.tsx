@@ -52,13 +52,22 @@ const Home = () => (
             modélisation de la puissance, caractérisation du gisement éolien et identification
             des conditions optimales de fonctionnement.
           </p>
-          <Link
-            to="/analyse"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Analyser une éolienne
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link
+              to="/analyse"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Analyse éolienne
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              to="/analyse-meteo"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+            >
+              Analyse météo
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </motion.div>
       </div>
     </section>
