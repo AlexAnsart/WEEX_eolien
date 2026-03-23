@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEEX Éolien — Dashboard Phase 1 — Groupe 14</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0e17;
+    --surface: #111827;
+    --surface2: #1a2332;
+    --border: #1e2d3d;
+    --text: #e2e8f0;
+    --text-dim: #64748b;
+    --accent: #22d3ee;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --orange: #fb923c;
+    --red: #f87171;
+    --blue: #60a5fa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: linear-gradient(180deg, rgba(34,211,238,0.04) 0%, transparent 100%);
+  }
+  header h1 {
+    font-size: 20px; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  header .badge {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 6px 14px; border-radius: 20px; font-size: 13px; color: var(--text-dim);
+  }
+
+  .stats-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; padding: 20px 32px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 6px; }
+  .stat-card .value { font-size: 22px; font-weight: 700; }
+  .stat-card .unit { font-size: 12px; color: var(--text-dim); margin-left: 4px; }
+
+  .tabs {
+    display: flex; gap: 4px; padding: 0 32px; border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 12px 20px; font-size: 14px; cursor: pointer; border: none;
+    background: transparent; color: var(--text-dim); font-family: inherit;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .content { padding: 24px 32px; }
+
+  /* Charts */
+  .chart-container {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; margin-bottom: 20px;
+    position: relative;
+  }
+  .chart-title {
+    font-size: 16px; font-weight: 600; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chart-title .dot { width: 8px; height: 8px; border-radius: 50%; }
+  
+  canvas { width: 100% !important; height: auto !important; }
+  
+  svg { overflow: visible; }
+  
+  /* Grid / Parcelles */
+  .grid-container {
+    display: flex; gap: 24px; flex-wrap: wrap;
+  }
+  .centrosus-grid {
+    flex: 1; min-width: 500px;
+  }
+  .grid-legend {
+    width: 250px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px; padding: 4px 0;
+    font-size: 13px;
+  }
+  .legend-swatch {
+    width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; font-size: 12px;
+    pointer-events: none; z-index: 999; opacity: 0; transition: opacity 0.15s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .tooltip.visible { opacity: 1; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  .info-box {
+    background: rgba(34,211,238,0.06); border: 1px solid rgba(34,211,238,0.15);
+    border-radius: 8px; padding: 14px 18px; font-size: 13px; line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .info-box strong { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>WEEX Éolien — Phase 1 — Éolienne Type 14</h1>
+  <span class="badge mono">Groupe 14 · Année Météo 2008</span>
+</header>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="label">Diamètre rotor</div>
+    <div class="value">80<span class="unit">m</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Puissance nominale</div>
+    <div class="value">2 320<span class="unit">kW</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Rendement η</div>
+    <div class="value mono">0.305<span class="unit">± 0.008</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Plage de vent</div>
+    <div class="value">3–25<span class="unit">m/s</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Prix unitaire</div>
+    <div class="value">4.5<span class="unit">M€</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Weibull k / C</div>
+    <div class="value mono" style="font-size:18px">1.83 / 9.87</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="power">Courbe de puissance</button>
+  <button class="tab" data-tab="wind">Distribution du vent</button>
+  <button class="tab" data-tab="map">Carte Centrosus</button>
+  <button class="tab" data-tab="analysis">Analyse η</button>
+</div>
+
+<div class="content" id="content">
+  <!-- Filled by JS -->
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// =================== DATA ===================
+const POWER_CURVE = [{"v":0.2,"p_mean":0,"p_std":0,"n":100},{"v":0.8,"p_mean":0,"p_std":0,"n":227},{"v":1.2,"p_mean":0,"p_std":0,"n":351},{"v":1.8,"p_mean":0,"p_std":0,"n":423},{"v":2.2,"p_mean":0,"p_std":0,"n":536},{"v":2.8,"p_mean":1.7,"p_std":4.9,"n":609},{"v":3.2,"p_mean":20.6,"p_std":2.7,"n":615},{"v":3.8,"p_mean":31.3,"p_std":3.5,"n":695},{"v":4.2,"p_mean":45.3,"p_std":4.7,"n":745},{"v":4.8,"p_mean":62.9,"p_std":5.9,"n":755},{"v":5.2,"p_mean":84.6,"p_std":7.1,"n":820},{"v":5.8,"p_mean":110.6,"p_std":8.5,"n":784},{"v":6.2,"p_mean":141.9,"p_std":10.3,"n":809},{"v":6.8,"p_mean":178.4,"p_std":12.1,"n":802},{"v":7.2,"p_mean":221.1,"p_std":13.8,"n":802},{"v":7.8,"p_mean":269.6,"p_std":16,"n":774},{"v":8.2,"p_mean":325,"p_std":17.7,"n":777},{"v":8.8,"p_mean":386.9,"p_std":20.8,"n":704},{"v":9.2,"p_mean":455.7,"p_std":24,"n":689},{"v":9.8,"p_mean":534,"p_std":26.5,"n":691},{"v":10.2,"p_mean":619.8,"p_std":28.8,"n":619},{"v":10.8,"p_mean":713,"p_std":31.8,"n":577},{"v":11.2,"p_mean":817.1,"p_std":37.7,"n":594},{"v":11.8,"p_mean":933.3,"p_std":39.7,"n":518},{"v":12.2,"p_mean":1054.8,"p_std":41.8,"n":485},{"v":12.8,"p_mean":1185.7,"p_std":46.7,"n":431},{"v":13.2,"p_mean":1331.5,"p_std":50.3,"n":426},{"v":13.8,"p_mean":1486.3,"p_std":56.9,"n":384},{"v":14.2,"p_mean":1660.3,"p_std":62.6,"n":344},{"v":14.8,"p_mean":1834.6,"p_std":65.1,"n":315},{"v":15.2,"p_mean":2022.4,"p_std":72,"n":286},{"v":15.8,"p_mean":2230,"p_std":75.8,"n":252},{"v":16.2,"p_mean":2318.3,"p_std":48.4,"n":230},{"v":16.8,"p_mean":2324,"p_std":51.8,"n":224},{"v":17.2,"p_mean":2324.1,"p_std":51.1,"n":180},{"v":17.8,"p_mean":2334.3,"p_std":48.4,"n":153},{"v":18.2,"p_mean":2311.7,"p_std":50.1,"n":151},{"v":18.8,"p_mean":2327.5,"p_std":49.3,"n":128},{"v":19.2,"p_mean":2327.5,"p_std":51.2,"n":108},{"v":19.8,"p_mean":2320.3,"p_std":47.4,"n":108},{"v":20.2,"p_mean":2323.3,"p_std":53.2,"n":78},{"v":20.8,"p_mean":2323.2,"p_std":49.2,"n":72},{"v":21.2,"p_mean":2328.1,"p_std":49.9,"n":65},{"v":21.8,"p_mean":2328,"p_std":54.7,"n":53},{"v":22.2,"p_mean":2322.3,"p_std":48.5,"n":48},{"v":22.8,"p_mean":2335.1,"p_std":55.3,"n":38},{"v":23.2,"p_mean":2306,"p_std":57.8,"n":35},{"v":23.8,"p_mean":2302,"p_std":47.9,"n":23},{"v":24.2,"p_mean":2308.2,"p_std":46.8,"n":28},{"v":24.8,"p_mean":2118.2,"p_std":687.1,"n":22},{"v":25.2,"p_mean":0,"p_std":0,"n":13},{"v":25.8,"p_mean":0,"p_std":0,"n":17},{"v":26.2,"p_mean":0,"p_std":0,"n":13},{"v":26.8,"p_mean":0,"p_std":0,"n":8},{"v":27.2,"p_mean":0,"p_std":0,"n":4}];
+
+const SCATTER = [{"v":5.8,"p":112.7},{"v":15.5,"p":2076.4},{"v":1.9,"p":0},{"v":5.4,"p":94},{"v":11.6,"p":883.1},{"v":14.4,"p":1740.5},{"v":13.9,"p":1564.4},{"v":15,"p":1895.4},{"v":4.7,"p":59.1},{"v":3.3,"p":19.7},{"v":2.6,"p":0},{"v":10.6,"p":701.5},{"v":5.2,"p":81},{"v":13.1,"p":1302.3},{"v":3,"p":15.5},{"v":7.8,"p":278.4},{"v":11.6,"p":875.5},{"v":9.2,"p":446},{"v":6.8,"p":172.9},{"v":19.5,"p":2355.8},{"v":5.4,"p":92.3},{"v":7.4,"p":220.5},{"v":9.5,"p":474.6},{"v":5.1,"p":76.1},{"v":10.1,"p":563.5},{"v":14.7,"p":1752.4},{"v":16.1,"p":2338.2},{"v":10.8,"p":744},{"v":9.1,"p":432},{"v":7.6,"p":242.8},{"v":7.8,"p":262.7},{"v":6.4,"p":148.2},{"v":1.3,"p":0},{"v":10.2,"p":583.3},{"v":8.9,"p":409.8},{"v":6.7,"p":165.3},{"v":14.8,"p":1827.4},{"v":14.2,"p":1617},{"v":7.6,"p":245.5},{"v":2.1,"p":0},{"v":6,"p":127.6},{"v":4.5,"p":52},{"v":4.5,"p":48.9},{"v":7,"p":202.5},{"v":6.1,"p":125},{"v":10.6,"p":693.9},{"v":9.1,"p":432.8},{"v":2,"p":0},{"v":11.1,"p":770.1},{"v":3.1,"p":17}];
+
+const SPEED_HIST = [{"v":0,"d":0.0138},{"v":1,"d":0.0374},{"v":2,"d":0.0563},{"v":3,"d":0.0655},{"v":4,"d":0.0754},{"v":5,"d":0.0817},{"v":6,"d":0.0815},{"v":7,"d":0.0797},{"v":8,"d":0.0751},{"v":9,"d":0.0703},{"v":10,"d":0.062},{"v":11,"d":0.0557},{"v":12,"d":0.049},{"v":13,"d":0.042},{"v":14,"d":0.0332},{"v":15,"d":0.0277},{"v":16,"d":0.0238},{"v":17,"d":0.0173},{"v":18,"d":0.0144},{"v":19,"d":0.0108},{"v":20,"d":0.0081},{"v":21,"d":0.0064},{"v":22,"d":0.0044},{"v":23,"d":0.0031},{"v":24,"d":0.0023},{"v":25,"d":0.0016},{"v":26,"d":0.0012},{"v":27,"d":3e-4}];
+
+const DIR_COUNTS = [{"a":7,"c":884},{"a":22,"c":926},{"a":37,"c":984},{"a":52,"c":903},{"a":67,"c":978},{"a":82,"c":942},{"a":97,"c":940},{"a":112,"c":941},{"a":127,"c":951},{"a":142,"c":876},{"a":157,"c":1002},{"a":172,"c":923},{"a":187,"c":975},{"a":202,"c":901},{"a":217,"c":509},{"a":232,"c":352},{"a":247,"c":390},{"a":262,"c":363},{"a":277,"c":345},{"a":292,"c":847},{"a":307,"c":935},{"a":322,"c":911},{"a":337,"c":960},{"a":352,"c":974}];
+
+const PARCELLES = [{"x":3,"y":"H","cap":32},{"x":3,"y":"J","cap":27},{"x":4,"y":"E","cap":27},{"x":4,"y":"H","cap":30},{"x":5,"y":"G","cap":29},{"x":6,"y":"G","cap":30},{"x":7,"y":"C","cap":0},{"x":8,"y":"C","cap":0},{"x":8,"y":"H","cap":0},{"x":9,"y":"E","cap":26},{"x":9,"y":"F","cap":26},{"x":11,"y":"E","cap":27},{"x":12,"y":"E","cap":28},{"x":13,"y":"F","cap":26},{"x":14,"y":"J","cap":0},{"x":15,"y":"J","cap":0},{"x":16,"y":"E","cap":32},{"x":18,"y":"F","cap":29},{"x":18,"y":"G","cap":27},{"x":18,"y":"H","cap":26}];
+
+const ETA_BY_BIN = [{"v":"3-4","mean":0.3045,"std":0.0098},{"v":"4-5","mean":0.3046,"std":0.0088},{"v":"5-6","mean":0.3047,"std":0.0081},{"v":"6-7","mean":0.3046,"std":0.0078},{"v":"7-8","mean":0.3047,"std":0.0076},{"v":"8-9","mean":0.3047,"std":0.0072},{"v":"9-10","mean":0.3048,"std":0.0072},{"v":"10-11","mean":0.3048,"std":0.0069},{"v":"11-12","mean":0.3045,"std":0.007},{"v":"12-13","mean":0.3042,"std":0.0069},{"v":"13-14","mean":0.3044,"std":0.0066},{"v":"14-15","mean":0.3048,"std":0.0068},{"v":"15-16","mean":0.3041,"std":0.0066}];
+
+// =================== TABS ===================
+const tabs = document.querySelectorAll('.tab');
+const content = document.getElementById('content');
+const tooltip = document.getElementById('tooltip');
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    render(tab.dataset.tab);
+  });
+});
+
+function render(tab) {
+  switch(tab) {
+    case 'power': renderPower(); break;
+    case 'wind': renderWind(); break;
+    case 'map': renderMap(); break;
+    case 'analysis': renderAnalysis(); break;
+  }
+}
+
+// =================== SVG HELPERS ===================
+function svgChart(w, h, margin, fn) {
+  const iw = w - margin.l - margin.r;
+  const ih = h - margin.t - margin.b;
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%">
+    <g transform="translate(${margin.l},${margin.t})">${fn(iw, ih)}</g>
+  </svg>`;
+}
+
+function scaleLinear(domain, range) {
+  const [d0, d1] = domain;
+  const [r0, r1] = range;
+  const f = v => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+  f.ticks = (n=5) => {
+    const step = (d1 - d0) / n;
+    return Array.from({length: n+1}, (_, i) => d0 + i * step);
+  };
+  return f;
+}
+
+function gridLines(xScale, yScale, w, h, xTicks, yTicks) {
+  let s = '';
+  yTicks.forEach(t => {
+    const y = yScale(t);
+    s += `<line x1="0" y1="${y}" x2="${w}" y2="${y}" stroke="#1e2d3d" stroke-width="0.5"/>`;
+    s += `<text x="-8" y="${y+4}" fill="#64748b" font-size="11" text-anchor="end" font-family="JetBrains Mono,monospace">${t}</text>`;
+  });
+  xTicks.forEach(t => {
+    const x = xScale(t);
+    s += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#1e2d3d" stroke-width="0.5"/>`;
+    s += `<text x="${x}" y="${h+18}" fill="#64748b" font-size="11" text-anchor="middle" font-family="JetBrains Mono,monospace">${t}</text>`;
+  });
+  return s;
+}
+
+// =================== POWER CURVE ===================
+function renderPower() {
+  const m = {l:60, r:20, t:20, b:40};
+  const W = 800, H = 400;
+
+  const chart = svgChart(W, H, m, (w, h) => {
+    const xS = scaleLinear([0, 28], [0, w]);
+    const yS = scaleLinear([0, 2500], [h, 0]);
+    const xT = [0, 3, 5, 10, 15, 16, 20, 25, 28];
+    const yT = [0, 500, 1000, 1500, 2000, 2500];
+
+    let svg = gridLines(xS, yS, w, h, xT, yT);
+
+    // Confidence band (±2σ)
+    const validPts = POWER_CURVE.filter(d => d.p_mean > 0 || d.v < 3);
+    let upper = '', lower = '';
+    validPts.forEach(d => { upper += `${xS(d.v)},${yS(Math.min(2500, d.p_mean + 2*d.p_std))} `; });
+    [...validPts].reverse().forEach(d => { lower += `${xS(d.v)},${yS(Math.max(0, d.p_mean - 2*d.p_std))} `; });
+    svg += `<polygon points="${upper} ${lower}" fill="rgba(34,211,238,0.1)" stroke="none"/>`;
+
+    // ±1σ band
+    upper = ''; lower = '';
+    validPts.forEach(d => { upper += `${xS(d.v)},${yS(Math.min(2500, d.p_mean + d.p_std))} `; });
+    [...validPts].reverse().forEach(d => { lower += `${xS(d.v)},${yS(Math.max(0, d.p_mean - d.p_std))} `; });
+    svg += `<polygon points="${upper} ${lower}" fill="rgba(34,211,238,0.15)" stroke="none"/>`;
+
+    // Scatter points
+    SCATTER.forEach(d => {
+      svg += `<circle cx="${xS(d.v)}" cy="${yS(d.p)}" r="1.5" fill="rgba(96,165,250,0.25)"/>`;
+    });
+
+    // Mean line
+    let path = '';
+    POWER_CURVE.forEach((d, i) => {
+      path += `${i===0?'M':'L'}${xS(d.v)},${yS(d.p_mean)} `;
+    });
+    svg += `<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`;
+
+    // Zone annotations
+    svg += `<line x1="${xS(3)}" y1="0" x2="${xS(3)}" y2="${h}" stroke="var(--green)" stroke-width="1" stroke-dasharray="4"/>`;
+    svg += `<text x="${xS(3)+4}" y="14" fill="var(--green)" font-size="10">V_dem=3</text>`;
+    svg += `<line x1="${xS(16)}" y1="0" x2="${xS(16)}" y2="${h}" stroke="var(--orange)" stroke-width="1" stroke-dasharray="4"/>`;
+    svg += `<text x="${xS(16)+4}" y="14" fill="var(--orange)" font-size="10">V_écrêt=16</text>`;
+    svg += `<line x1="${xS(25)}" y1="0" x2="${xS(25)}" y2="${h}" stroke="var(--red)" stroke-width="1" stroke-dasharray="4"/>`;
+    svg += `<text x="${xS(25)+4}" y="14" fill="var(--red)" font-size="10">V_arrêt=25</text>`;
+
+    // Axis labels
+    svg += `<text x="${w/2}" y="${h+36}" fill="var(--text-dim)" font-size="12" text-anchor="middle">Vitesse du vent (m/s)</text>`;
+    svg += `<text x="-45" y="${h/2}" fill="var(--text-dim)" font-size="12" text-anchor="middle" transform="rotate(-90,-45,${h/2})">Puissance (kW)</text>`;
+
+    return svg;
+  });
+
+  content.innerHTML = `
+    <div class="info-box">
+      <strong>Courbe de puissance P(V)</strong> — Données réelles de l'éolienne Type 14 (19 738 mesures, statut ON).
+      La ligne cyan = moyenne par bin de 0.5 m/s. Les bandes = ±1σ et ±2σ. Les points bleus = échantillon de mesures brutes.
+      Trois régimes : zone morte (V&lt;3), zone cubique (3–16), plateau d'écrêtage (16–25), arrêt (V&gt;25).
+    </div>
+    <div class="chart-container">
+      <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>P(V) avec intervalles de confiance</div>
+      ${chart}
+    </div>
+
+    <div class="two-col">
+      <div class="chart-container">
+        <div class="chart-title"><span class="dot" style="background:var(--green)"></span>Modèle physique</div>
+        <div style="font-size:14px; line-height:1.8; font-family:'JetBrains Mono',monospace; color:var(--text-dim)">
+          P = η × (16/27) × ½ × ρ × V³ × πD²/4<br>
+          <span style="color:var(--accent)">η = 0.3046 ± 0.0077</span><br>
+          ρ = 1.269 kg/m³ (mesuré)<br>
+          D = 80 m<br>
+          P_nom ≈ <span style="color:var(--orange)">2 320 kW</span><br><br>
+          <span style="color:var(--text); font-family:'DM Sans'">→ η est remarquablement stable<br>(σ/μ = 2.5% seulement)</span>
+        </div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title"><span class="dot" style="background:var(--orange)"></span>Données clés</div>
+        <div style="font-size:13px; line-height:2">
+          <div>Mesures totales : <strong class="mono">19 918</strong></div>
+          <div>Éolienne ON : <strong class="mono">19 738</strong> (99.1%)</div>
+          <div>Éolienne OFF : <strong class="mono">180</strong> (maintenance)</div>
+          <div>Anomalies (ON, V>3, P=0) : <strong class="mono" style="color:var(--orange)">57</strong> (0.3%)</div>
+          <div>V moyen (ON) : <strong class="mono">8.77 m/s</strong></div>
+          <div>P moyen (ON) : <strong class="mono">627 kW</strong></div>
+          <div>Rendement Betz total (η×16/27) : <strong class="mono">18.1%</strong></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// =================== WIND DISTRIBUTION ===================
+function renderWind() {
+  const m = {l:50, r:20, t:20, b:40};
+  const W = 800, H = 350;
+
+  // Histogram + Weibull
+  const histChart = svgChart(W, H, m, (w, h) => {
+    const xS = scaleLinear([0, 28], [0, w]);
+    const yS = scaleLinear([0, 0.09], [h, 0]);
+    const barW = w / 28;
+    let svg = gridLines(xS, yS, w, h, [0,5,10,15,20,25], [0,0.02,0.04,0.06,0.08]);
+
+    // Histogram bars
+    SPEED_HIST.forEach(d => {
+      const bh = h - yS(d.d);
+      svg += `<rect x="${xS(d.v)}" y="${yS(d.d)}" width="${barW-1}" height="${bh}" fill="rgba(96,165,250,0.4)" rx="1"/>`;
+    });
+
+    // Weibull theoretical curve
+    const k = 1.827, C = 9.873;
+    let path = '';
+    for (let v = 0.1; v <= 28; v += 0.2) {
+      const pdf = (k/C) * Math.pow(v/C, k-1) * Math.exp(-Math.pow(v/C, k));
+      path += `${v===0.1?'M':'L'}${xS(v)},${yS(pdf)} `;
+    }
+    svg += `<path d="${path}" fill="none" stroke="var(--red)" stroke-width="2"/>`;
+
+    svg += `<text x="${w/2}" y="${h+36}" fill="var(--text-dim)" font-size="12" text-anchor="middle">Vitesse du vent (m/s)</text>`;
+    svg += `<text x="${w-10}" y="16" fill="var(--red)" font-size="11" text-anchor="end">Weibull(k=1.83, C=9.87)</text>`;
+    return svg;
+  });
+
+  // Wind rose (polar)
+  const roseSize = 300;
+  const cx = roseSize/2, cy = roseSize/2, rMax = 120;
+  const maxCount = Math.max(...DIR_COUNTS.map(d => d.c));
+  let roseSvg = `<svg viewBox="0 0 ${roseSize} ${roseSize}" xmlns="http://www.w3.org/2000/svg" style="max-width:${roseSize}px">`;
+  // Grid circles
+  [0.25, 0.5, 0.75, 1].forEach(f => {
+    roseSvg += `<circle cx="${cx}" cy="${cy}" r="${rMax*f}" fill="none" stroke="#1e2d3d" stroke-width="0.5"/>`;
+  });
+  // Cardinal lines
+  [[0,'N'],[90,'E'],[180,'S'],[270,'W']].forEach(([a, label]) => {
+    const rad = (a - 90) * Math.PI / 180;
+    roseSvg += `<line x1="${cx}" y1="${cy}" x2="${cx+rMax*Math.cos(rad)}" y2="${cy+rMax*Math.sin(rad)}" stroke="#1e2d3d"/>`;
+    roseSvg += `<text x="${cx+(rMax+14)*Math.cos(rad)}" y="${cy+(rMax+14)*Math.sin(rad)+4}" fill="var(--text-dim)" font-size="12" text-anchor="middle">${label}</text>`;
+  });
+  // Bars
+  DIR_COUNTS.forEach(d => {
+    const r = (d.c / maxCount) * rMax;
+    const a1 = (d.a - 7.5 - 90) * Math.PI / 180;
+    const a2 = (d.a + 7.5 - 90) * Math.PI / 180;
+    const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+    const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+    const large = 0;
+    roseSvg += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="rgba(34,211,238,0.5)" stroke="rgba(34,211,238,0.8)" stroke-width="0.5"/>`;
+  });
+  roseSvg += '</svg>';
+
+  content.innerHTML = `
+    <div class="info-box">
+      <strong>Distribution du vent</strong> — Données issues du fichier éolienne Type 14 (mesures au mât). 
+      La distribution suit bien une <strong>Weibull(k=1.83, C=9.87)</strong>. La rose des vents montre la distribution directionnelle.
+      ⚠️ Convention : la direction indique <strong>où va</strong> le vent (pas d'où il vient).
+    </div>
+    <div class="two-col">
+      <div class="chart-container">
+        <div class="chart-title"><span class="dot" style="background:var(--blue)"></span>Histogramme des vitesses + Weibull</div>
+        ${histChart}
+      </div>
+      <div class="chart-container" style="display:flex; flex-direction:column; align-items:center">
+        <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>Rose des vents (direction)</div>
+        ${roseSvg}
+        <div style="margin-top:12px; font-size:12px; color:var(--text-dim)">Distribution assez uniforme, léger creux W-SW (217°-277°)</div>
+      </div>
+    </div>
+  `;
+}
+
+// =================== MAP ===================
+function renderMap() {
+  const rows = 'ABCDEFGHIJKL'.split('');
+  const cols = Array.from({length:19}, (_,i) => i+1);
+  const cellW = 38, cellH = 34;
+  const mL = 24, mT = 24;
+  const W = mL + cols.length * cellW + 10;
+  const H = mT + rows.length * cellH + 10;
+
+  // Island mask (approximate)
+  const islandCells = new Set();
+  const islandMap = {
+    'B': [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    'C': [4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    'D': [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    'E': [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    'F': [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    'G': [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    'H': [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    'I': [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,18,19],
+    'J': [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,19],
+    'K': [1,2,3,4],
+    'L': [1,2,3],
+  };
+  for (const [r, cs] of Object.entries(islandMap)) cs.forEach(c => islandCells.add(`${c}${r}`));
+
+  const parcMap = {};
+  PARCELLES.forEach(p => { parcMap[`${p.x}${p.y}`] = p; });
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%">`;
+
+  // Col headers
+  cols.forEach((c, i) => {
+    svg += `<text x="${mL + i*cellW + cellW/2}" y="16" fill="var(--text-dim)" font-size="10" text-anchor="middle" font-family="JetBrains Mono,monospace">${c}</text>`;
+  });
+  // Row headers
+  rows.forEach((r, j) => {
+    svg += `<text x="12" y="${mT + j*cellH + cellH/2 + 4}" fill="var(--text-dim)" font-size="10" text-anchor="middle" font-family="JetBrains Mono,monospace">${r}</text>`;
+  });
+
+  rows.forEach((r, j) => {
+    cols.forEach((c, i) => {
+      const key = `${c}${r}`;
+      const x = mL + i * cellW;
+      const y = mT + j * cellH;
+      const isIsland = islandCells.has(key);
+      const parc = parcMap[key];
+
+      let fill = '#0c1222'; // sea
+      if (isIsland) fill = '#1a2a1a'; // land
+      if (parc && parc.cap > 0) fill = '#1a3a2a'; // usable parcelle
+      if (parc && parc.cap === 0) fill = '#3a2a1a'; // unusable for D=80
+
+      svg += `<rect x="${x}" y="${y}" width="${cellW-1}" height="${cellH-1}" rx="3" fill="${fill}" stroke="${parc ? (parc.cap > 0 ? 'var(--green)' : 'var(--red)') : '#1e2d3d'}" stroke-width="${parc ? 1.5 : 0.5}"/>`;
+
+      if (parc && parc.cap > 0) {
+        svg += `<text x="${x+cellW/2}" y="${y+cellH/2-3}" fill="var(--green)" font-size="8" text-anchor="middle" font-family="JetBrains Mono,monospace" font-weight="700">${parc.cap}</text>`;
+        svg += `<text x="${x+cellW/2}" y="${y+cellH/2+8}" fill="var(--text-dim)" font-size="7" text-anchor="middle">éol.</text>`;
+      } else if (parc && parc.cap === 0) {
+        svg += `<text x="${x+cellW/2}" y="${y+cellH/2+3}" fill="var(--red)" font-size="7" text-anchor="middle">D≥135</text>`;
+      }
+    });
+  });
+  svg += '</svg>';
+
+  content.innerHTML = `
+    <div class="info-box">
+      <strong>Carte de Centrosus</strong> — Grille 19×12, chaque cellule = 5×5 km.
+      Les <span style="color:var(--green)">parcelles vertes</span> acceptent notre éolienne Type 14 (D=80m) avec le nombre max d'éoliennes indiqué.
+      Les <span style="color:var(--red)">parcelles rouges</span> n'acceptent que D≥135m (incompatibles). Les 228 fichiers météo couvrent toute la grille.
+    </div>
+    <div class="chart-container">
+      <div class="chart-title"><span class="dot" style="background:var(--green)"></span>Parcelles d'implantation — Capacité Type 14 (D=80m)</div>
+      ${svg}
+    </div>
+    <div class="two-col">
+      <div class="chart-container">
+        <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>Parcelles compatibles Type 14</div>
+        <table style="width:100%; font-size:13px; border-collapse:collapse">
+          <tr style="color:var(--text-dim)"><th style="text-align:left;padding:6px">Parcelle</th><th>Cap. max</th><th>Coût max (M€)</th></tr>
+          ${PARCELLES.filter(p=>p.cap>0).map(p => `<tr style="border-top:1px solid var(--border)"><td style="padding:6px" class="mono">${p.x}${p.y}</td><td style="text-align:center" class="mono">${p.cap}</td><td style="text-align:center" class="mono">${(p.cap*4.5).toFixed(1)}</td></tr>`).join('')}
+        </table>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title"><span class="dot" style="background:var(--orange)"></span>Contraintes budget</div>
+        <div style="font-size:13px; line-height:2">
+          <div>Budget total max : <strong class="mono">600 M€</strong></div>
+          <div>Prix par éolienne : <strong class="mono">4.5 M€</strong></div>
+          <div>→ Max éoliennes global : <strong class="mono">${Math.floor(600/4.5)}</strong></div>
+          <div>Capacité totale (15 parcelles) : <strong class="mono">${PARCELLES.filter(p=>p.cap>0).reduce((s,p)=>s+p.cap,0)}</strong></div>
+          <div>Coût si remplissage total : <strong class="mono">${(PARCELLES.filter(p=>p.cap>0).reduce((s,p)=>s+p.cap,0)*4.5).toFixed(0)} M€</strong></div>
+          <div style="margin-top:8px; padding:8px; background:rgba(251,146,60,0.1); border-radius:6px; color:var(--orange)">
+            ⚠️ Le budget est le facteur limitant (<strong>${Math.floor(600/4.5)}</strong> éoliennes max), 
+            pas la capacité parcellaire (<strong>${PARCELLES.filter(p=>p.cap>0).reduce((s,p)=>s+p.cap,0)}</strong>).
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// =================== ANALYSIS η ===================
+function renderAnalysis() {
+  const m = {l:60, r:20, t:20, b:50};
+  const W = 800, H = 300;
+
+  const etaChart = svgChart(W, H, m, (w, h) => {
+    const xS = scaleLinear([0, ETA_BY_BIN.length], [0, w]);
+    const yS = scaleLinear([0.28, 0.32], [h, 0]);
+    let svg = gridLines(xS, yS, w, h, [], [0.28, 0.29, 0.30, 0.31, 0.32]);
+
+    const barW = w / ETA_BY_BIN.length;
+    ETA_BY_BIN.forEach((d, i) => {
+      const x = xS(i) + barW*0.1;
+      const bw = barW * 0.8;
+      const cy = yS(d.mean);
+      const top = yS(d.mean + d.std);
+      const bot = yS(d.mean - d.std);
+
+      // Error bar
+      svg += `<line x1="${x+bw/2}" y1="${top}" x2="${x+bw/2}" y2="${bot}" stroke="var(--accent2)" stroke-width="2"/>`;
+      svg += `<line x1="${x+bw/4}" y1="${top}" x2="${x+3*bw/4}" y2="${top}" stroke="var(--accent2)" stroke-width="2"/>`;
+      svg += `<line x1="${x+bw/4}" y1="${bot}" x2="${x+3*bw/4}" y2="${bot}" stroke="var(--accent2)" stroke-width="2"/>`;
+      // Mean dot
+      svg += `<circle cx="${x+bw/2}" cy="${cy}" r="4" fill="var(--accent)"/>`;
+      // Label
+      svg += `<text x="${x+bw/2}" y="${h+16}" fill="var(--text-dim)" font-size="9" text-anchor="middle" font-family="JetBrains Mono,monospace">${d.v}</text>`;
+    });
+
+    // Global mean line
+    svg += `<line x1="0" y1="${yS(0.3046)}" x2="${w}" y2="${yS(0.3046)}" stroke="var(--orange)" stroke-width="1.5" stroke-dasharray="6"/>`;
+    svg += `<text x="${w-4}" y="${yS(0.3046)-6}" fill="var(--orange)" font-size="10" text-anchor="end">η̄ = 0.3046</text>`;
+
+    svg += `<text x="${w/2}" y="${h+40}" fill="var(--text-dim)" font-size="12" text-anchor="middle">Bin de vitesse (m/s)</text>`;
+    svg += `<text x="-45" y="${h/2}" fill="var(--text-dim)" font-size="12" text-anchor="middle" transform="rotate(-90,-45,${h/2})">η (hors Betz)</text>`;
+    return svg;
+  });
+
+  content.innerHTML = `
+    <div class="info-box">
+      <strong>Analyse du rendement η</strong> — Résultat surprenant : η est quasiment constant sur toute la plage 3–16 m/s !
+      Ceci valide l'hypothèse d'un modèle physique simple. La variabilité résiduelle (σ ≈ 0.007) vient 
+      principalement des fluctuations de ρ (T, P) et des turbulences.
+    </div>
+    <div class="chart-container">
+      <div class="chart-title"><span class="dot" style="background:var(--accent2)"></span>η par bin de vitesse (±1σ)</div>
+      ${etaChart}
+    </div>
+    <div class="two-col">
+      <div class="chart-container">
+        <div class="chart-title"><span class="dot" style="background:var(--green)"></span>Conclusion modèle</div>
+        <div style="font-size:13px; line-height:1.8">
+          <p><strong style="color:var(--green)">✓ Le modèle P = η·(16/27)·½·ρ·V³·πD²/4 est excellent</strong></p>
+          <p style="margin-top:8px">η est constant à 2.5% près sur toute la plage utile. Aucune tendance visible en fonction de V.</p>
+          <p style="margin-top:8px">Cela signifie que le coefficient Cp(λ) de notre éolienne est bien régulé 
+          (le MPPT fonctionne correctement pour maintenir un point de fonctionnement optimal).</p>
+          <p style="margin-top:12px"><strong>Valeur recommandée :</strong></p>
+          <p class="mono" style="font-size:18px; color:var(--accent); margin-top:4px">η = 0.3046 ± 0.0077</p>
+          <p class="mono" style="color:var(--text-dim); margin-top:4px">η × 16/27 = 0.1805 (rendement total)</p>
+        </div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title"><span class="dot" style="background:var(--accent2)"></span>Impact de ρ(T, Patm)</div>
+        <div style="font-size:13px; line-height:1.8">
+          <p>La densité de l'air mesurée varie :</p>
+          <p class="mono" style="margin-top:8px">ρ̄ = 1.2694 kg/m³ ± 0.0274</p>
+          <p class="mono">Variation relative : ± 2.2%</p>
+          <p style="margin-top:12px">Formule exacte : <span class="mono">ρ = Patm / (287 × T_kelvin)</span></p>
+          <p style="margin-top:8px">→ L'approximation <span class="mono">ρ = 1.25</span> induit une erreur de ~1.5%. 
+          Utiliser ρ réel améliore marginalement le modèle, mais montre une compréhension physique fine.</p>
+          <p style="margin-top:12px; padding:8px; background:rgba(167,139,250,0.1); border-radius:6px; color:var(--accent2)">
+            💡 Piste pour le A : propager l'incertitude sur ρ dans le calcul de production via Monte Carlo.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Initial render
+render('power');
+</script>
+</body>
+</html>
