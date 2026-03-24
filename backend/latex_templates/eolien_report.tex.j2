@@ -1,44 +1,38 @@
-\documentclass[11pt,a4paper]{placeholder}
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage[french]{babel}
-\usepackage{graphicx}
-\usepackage{float}
-\usepackage{geometry}
-\geometry{margin=2.2cm}
-
-\title{ {{ payload.metadata.title|latex }} }
-\author{ {{ payload.metadata.students|join(", ")|latex }} }
-\date{\today}
+\documentclass{ {{- class_name -}} }
 
 \begin{document}
-\maketitle
 
-\section*{Informations}
-\textbf{UE:} {{ payload.metadata.ue|latex }} \\
-\textbf{Sujet:} {{ payload.metadata.subject|latex }} \\
-\textbf{Enseignant:} {{ payload.metadata.teacher|latex }} \\
-\textbf{Eleves:} {{ payload.metadata.students|join(", ")|latex }}
+%----------- Informations du rapport ---------
+\titre{ {{ payload.metadata.title|latex }} }
+\UE{ {{ payload.metadata.ue|latex }} }
+\sujet{}
+\enseignant{}
+\eleves{ {{ students_block }} }
+
+%----------- Initialisation -------------------
+\fairemarges
+\fairepagedegarde
 
 \section*{Introduction}
+ \addcontentsline{toc}{section}{Introduction}
 {{ payload.genericSections.introduction|latex }}
 
-\section*{Cadre theorique}
+\section{Cadre theorique}
 {{ payload.genericSections.theoreticalFramework|latex }}
 
-\section*{Methodologie}
+\section{Methodologie}
 {{ payload.genericSections.methodology|latex }}
 
-\section*{Synthese des indicateurs}
+\section{Synthese des indicateurs}
 \textbf{Notebook source:} {{ payload.analysisSummary.sourceNotebook|latex }} \\
 \textbf{Fichier de donnees:} {{ payload.analysisSummary.sourceDataFile|latex }} \\
 \textbf{Disponibilite:} {{ payload.analysisSummary.kpis.availability }}\% \\
 \textbf{Facteur de capacite:} {{ payload.analysisSummary.kpis.capacityFactor }} \\
 \textbf{Puissance nominale:} {{ payload.analysisSummary.kpis.ratedPower }} MW
 
-\section*{Analyses graphiques}
+\section{Analyses graphiques}
 {% for figure in figures %}
-\subsection*{ {{ payload.chartSections[loop.index0].title|latex }} }
+\subsection{ {{ payload.chartSections[loop.index0].title|latex }} }
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.9\textwidth]{images/{{ figure.filename }}}
@@ -48,6 +42,7 @@
 {% endfor %}
 
 \section*{Conclusion}
+\addcontentsline{toc}{section}{Conclusion}
 {{ payload.genericSections.conclusion|latex }}
 
 \end{document}

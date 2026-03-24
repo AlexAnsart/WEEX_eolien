@@ -19,7 +19,12 @@ import {
   YAxis,
 } from "recharts";
 import type { AnalysisPayload, EolienReportPayload, ReportChartSection } from "@/types/report";
-import { buildReportPayload, defaultGenericSections, loadAnalysisSnapshot } from "@/lib/report";
+import {
+  buildReportPayload,
+  defaultGenericSections,
+  defaultReportMetadata,
+  loadAnalysisSnapshot,
+} from "@/lib/report";
 
 type GenerationState = "idle" | "loading" | "success" | "error";
 
@@ -72,15 +77,9 @@ const ReportEditorEolien = () => {
   const [generationState, setGenerationState] = useState<GenerationState>("idle");
   const [generationError, setGenerationError] = useState<string | null>(null);
 
-  const [metadata, setMetadata] = useState<EolienReportPayload["metadata"]>({
-    title: "Rapport d'analyse eolienne",
-    ue: "WEEX",
-    subject: "Etude de performance d'une eolienne",
-    teacher: "A renseigner",
-    students: ["A renseigner"],
-  });
-
-  const [genericSections, setGenericSections] = useState(defaultGenericSections);
+  const [metadata, setMetadata] = useState<EolienReportPayload["metadata"]>(defaultReportMetadata);
+  const [authorsText, setAuthorsText] = useState(defaultReportMetadata.students.join("\n"));
+  const [conclusionText, setConclusionText] = useState(defaultGenericSections.conclusion);
   const [interpretations, setInterpretations] = useState<Record<string, string>>({
     powerCurve: "",
     windDistribution: "",
@@ -108,7 +107,7 @@ const ReportEditorEolien = () => {
       try {
         const response = await fetch("http://127.0.0.1:8000/api/analyse/main-louis");
         if (!response.ok) {
-          throw new Error("Impossible de charger l'analyse eolienne.");
+          throw new Error("Impossible de charger l'analyse éolienne.");
         }
         const payload = (await response.json()) as AnalysisPayload;
         setAnalysis(payload);
@@ -122,11 +121,11 @@ const ReportEditorEolien = () => {
 
   const chartSpecs = useMemo(
     () => [
-      { id: "powerCurve", title: "Courbe de puissance", caption: "Courbe de puissance mediane avec enveloppe Q10/Q90." },
+      { id: "powerCurve", title: "Courbe de puissance", caption: "Courbe de puissance médiane avec enveloppe Q10/Q90." },
       { id: "windDistribution", title: "Distribution des vitesses de vent", caption: "Histogramme des classes de vitesses et comparaison Weibull." },
-      { id: "windRose", title: "Rose des vents", caption: "Frequences directionnelles et puissance moyenne par direction." },
-      { id: "tempPower", title: "Effet temperature vs densite de puissance", caption: "Relation entre temperature et potentiel aerodynamique normalise." },
-      { id: "airDensity", title: "Distribution de densite de l'air", caption: "Histogramme des classes de densite de l'air observees." },
+      { id: "windRose", title: "Rose des vents", caption: "Fréquences directionnelles et puissance moyenne par direction." },
+      { id: "tempPower", title: "Effet température vs densité de puissance", caption: "Relation entre température et potentiel aérodynamique normalisé." },
+      { id: "airDensity", title: "Distribution de densité de l'air", caption: "Histogramme des classes de densité de l'air observées." },
     ] as const,
     [],
   );
@@ -136,7 +135,7 @@ const ReportEditorEolien = () => {
     for (const spec of chartSpecs) {
       const chartContainer = chartRefs[spec.id].current;
       if (!chartContainer) {
-        throw new Error(`Le graphique ${spec.title} n'est pas pret pour l'export.`);
+        throw new Error(`Le graphique ${spec.title} n'est pas prêt pour l'export.`);
       }
       const imageBase64 = await captureChartAsBase64(chartContainer);
       sections.push({
@@ -158,10 +157,22 @@ const ReportEditorEolien = () => {
     setGenerationError(null);
 
     try {
+      const normalizedStudents = authorsText
+        .split("\n")
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+      if (normalizedStudents.length === 0) {
+        throw new Error("Veuillez renseigner au moins un auteur.");
+      }
+
       const chartSections = await buildChartSections();
       const payload = buildReportPayload({
-        metadata,
-        genericSections,
+        metadata: { ...metadata, students: normalizedStudents },
+        genericSections: {
+          ...defaultGenericSections,
+          conclusion: conclusionText,
+        },
         analysis,
         chartSections,
       });
@@ -172,7 +183,7 @@ const ReportEditorEolien = () => {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        let message = "Erreur de generation PDF.";
+        let message = "Erreur de génération PDF.";
         try {
           const data = (await response.json()) as { detail?: string };
           if (data.detail) {
@@ -208,92 +219,33 @@ const ReportEditorEolien = () => {
   }
 
   if (!analysis) {
-    return <div className="px-6 py-8 text-sm text-muted-foreground">Chargement de l'analyse eolienne...</div>;
+    return <div className="px-6 py-8 text-sm text-muted-foreground">Chargement de l'analyse éolienne...</div>;
   }
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-foreground">Editeur de rapport eolien</h1>
+          <h1 className="font-display text-2xl font-semibold text-foreground">Éditeur de rapport éolien</h1>
           <p className="text-sm text-muted-foreground">
-            Structure uniforme avec sections fixes et interpretation analyste par graphique.
+            Structure uniforme avec sections fixes et interprétation analyste par graphique.
           </p>
         </div>
         <Link to="/analyse" className="text-sm text-primary hover:underline">
-          Retour a l'analyse
+          Retour à l'analyse
         </Link>
       </div>
 
-      <section className="glass-card grid gap-4 p-5 md:grid-cols-2">
+      <section className="glass-card grid gap-4 p-5">
         <label className="text-sm">
-          <span className="mb-1 block text-muted-foreground">Titre du rapport</span>
-          <input
-            value={metadata.title}
-            onChange={(e) => setMetadata((prev) => ({ ...prev, title: e.target.value }))}
-            className="w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-muted-foreground">UE</span>
-          <input
-            value={metadata.ue}
-            onChange={(e) => setMetadata((prev) => ({ ...prev, ue: e.target.value }))}
-            className="w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-muted-foreground">Sujet</span>
-          <input
-            value={metadata.subject}
-            onChange={(e) => setMetadata((prev) => ({ ...prev, subject: e.target.value }))}
-            className="w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block text-muted-foreground">Enseignant</span>
-          <input
-            value={metadata.teacher}
-            onChange={(e) => setMetadata((prev) => ({ ...prev, teacher: e.target.value }))}
-            className="w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </label>
-        <label className="text-sm md:col-span-2">
-          <span className="mb-1 block text-muted-foreground">Eleves (une ligne par nom)</span>
+          <span className="mb-1 block text-muted-foreground">Auteurs (une ligne par nom)</span>
           <textarea
-            value={metadata.students.join("\n")}
-            onChange={(e) =>
-              setMetadata((prev) => ({
-                ...prev,
-                students: e.target.value.split("\n").map((v) => v.trim()).filter(Boolean),
-              }))
-            }
+            value={authorsText}
+            onChange={(e) => setAuthorsText(e.target.value)}
             rows={3}
             className="w-full rounded-md border border-border bg-background px-3 py-2"
           />
         </label>
-      </section>
-
-      <section className="glass-card grid gap-4 p-5">
-        <h2 className="font-display text-lg font-semibold text-foreground">Sections generiques</h2>
-        {(
-          [
-            ["introduction", "Introduction"],
-            ["theoreticalFramework", "Cadre theorique"],
-            ["methodology", "Methodologie"],
-            ["conclusion", "Conclusion"],
-          ] as const
-        ).map(([key, label]) => (
-          <label className="text-sm" key={key}>
-            <span className="mb-1 block text-muted-foreground">{label}</span>
-            <textarea
-              value={genericSections[key]}
-              onChange={(e) => setGenericSections((prev) => ({ ...prev, [key]: e.target.value }))}
-              rows={4}
-              className="w-full rounded-md border border-border bg-background px-3 py-2"
-            />
-          </label>
-        ))}
       </section>
 
       <section className="grid gap-6">
@@ -311,7 +263,7 @@ const ReportEditorEolien = () => {
                 <Legend />
                 <Line dataKey="q90" stroke="hsl(var(--chart-1))" strokeDasharray="6 4" dot={false} name="Q90" />
                 <Line dataKey="q10" stroke="hsl(var(--chart-1))" strokeDasharray="6 4" dot={false} name="Q10" />
-                <Line dataKey="power" stroke="hsl(var(--chart-1))" strokeWidth={2.6} dot={false} name="Mediane" />
+                <Line dataKey="power" stroke="hsl(var(--chart-1))" strokeWidth={2.6} dot={false} name="Médiane" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -319,7 +271,7 @@ const ReportEditorEolien = () => {
             value={interpretations.powerCurve}
             onChange={(e) => setInterpretations((prev) => ({ ...prev, powerCurve: e.target.value }))}
             rows={4}
-            placeholder="Interpretation analyste"
+            placeholder="Interprétation analyste"
             className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
           />
         </div>
@@ -334,7 +286,7 @@ const ReportEditorEolien = () => {
                 <YAxis />
                 <RechartsTooltip />
                 <Legend />
-                <Bar dataKey="pct" fill="hsl(var(--chart-2))" name="Frequence observee [%]" />
+                <Bar dataKey="pct" fill="hsl(var(--chart-2))" name="Fréquence observée [%]" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -342,7 +294,7 @@ const ReportEditorEolien = () => {
             value={interpretations.windDistribution}
             onChange={(e) => setInterpretations((prev) => ({ ...prev, windDistribution: e.target.value }))}
             rows={4}
-            placeholder="Interpretation analyste"
+            placeholder="Interprétation analyste"
             className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
           />
         </div>
@@ -355,7 +307,7 @@ const ReportEditorEolien = () => {
                 <PolarGrid />
                 <PolarAngleAxis dataKey="dir" />
                 <PolarRadiusAxis />
-                <Radar name="Frequence" dataKey="freq" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.25} />
+                <Radar name="Fréquence" dataKey="freq" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.25} />
                 <Radar name="Puissance moyenne (kW)" dataKey="avgPower" stroke="hsl(var(--chart-5))" fill="hsl(var(--chart-5))" fillOpacity={0.2} />
                 <Legend />
               </RadarChart>
@@ -365,13 +317,13 @@ const ReportEditorEolien = () => {
             value={interpretations.windRose}
             onChange={(e) => setInterpretations((prev) => ({ ...prev, windRose: e.target.value }))}
             rows={4}
-            placeholder="Interpretation analyste"
+            placeholder="Interprétation analyste"
             className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
           />
         </div>
 
         <div className="glass-card p-5">
-          <h3 className="mb-3 font-medium">4. Temperature et densite de puissance</h3>
+          <h3 className="mb-3 font-medium">4. Température et densité de puissance</h3>
           <div ref={chartRefs.tempPower} className="rounded border border-border bg-background p-2">
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={analysis.tempPowerData}>
@@ -388,13 +340,13 @@ const ReportEditorEolien = () => {
             value={interpretations.tempPower}
             onChange={(e) => setInterpretations((prev) => ({ ...prev, tempPower: e.target.value }))}
             rows={4}
-            placeholder="Interpretation analyste"
+            placeholder="Interprétation analyste"
             className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
           />
         </div>
 
         <div className="glass-card p-5">
-          <h3 className="mb-3 font-medium">5. Distribution densite de l'air</h3>
+          <h3 className="mb-3 font-medium">5. Distribution densité de l'air</h3>
           <div ref={chartRefs.airDensity} className="rounded border border-border bg-background p-2">
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={analysis.airDensityData}>
@@ -411,10 +363,35 @@ const ReportEditorEolien = () => {
             value={interpretations.airDensity}
             onChange={(e) => setInterpretations((prev) => ({ ...prev, airDensity: e.target.value }))}
             rows={4}
-            placeholder="Interpretation analyste"
+            placeholder="Interprétation analyste"
             className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
           />
         </div>
+      </section>
+
+      <section className="glass-card grid gap-4 p-5">
+        <h2 className="font-display text-lg font-semibold text-foreground">Conclusion</h2>
+        <div className="rounded-lg bg-muted/40 p-4 text-sm">
+          <p className="mb-2 font-medium text-foreground">Résumé de l'analyse éolienne</p>
+          <div className="grid gap-2 text-muted-foreground md:grid-cols-2">
+            <p>Mesures retenues: <span className="font-medium text-foreground">{analysis.kpis.retainedMeasurements.toLocaleString()}</span></p>
+            <p>Disponibilité: <span className="font-medium text-foreground">{analysis.kpis.availability}%</span></p>
+            <p>Puissance nominale: <span className="font-medium text-foreground">{analysis.kpis.ratedPower} MW</span></p>
+            <p>Facteur de capacité: <span className="font-medium text-foreground">{(analysis.kpis.capacityFactor * 100).toFixed(0)}%</span></p>
+            <p>Weibull k/c: <span className="font-medium text-foreground">{analysis.kpis.weibullK} / {analysis.kpis.weibullC}</span></p>
+            <p>Vitesse moyenne: <span className="font-medium text-foreground">{analysis.kpis.meanWindSpeed} m/s</span></p>
+          </div>
+        </div>
+        <label className="text-sm">
+          <span className="mb-1 block text-muted-foreground">Conclusion de l'auteur</span>
+          <textarea
+            value={conclusionText}
+            onChange={(e) => setConclusionText(e.target.value)}
+            rows={5}
+            placeholder="Rédigez ici la conclusion du rapport."
+            className="w-full rounded-md border border-border bg-background px-3 py-2"
+          />
+        </label>
       </section>
 
       <section className="glass-card flex items-center justify-between gap-3 p-5">
@@ -422,9 +399,9 @@ const ReportEditorEolien = () => {
           Source: {analysis.sourceNotebook} · {analysis.sourceDataFile}
         </div>
         <div className="flex items-center gap-3">
-          {generationState === "success" && <span className="text-sm text-chart-2">PDF genere avec succes.</span>}
+          {generationState === "success" && <span className="text-sm text-chart-2">PDF généré avec succès.</span>}
           {generationState === "error" && (
-            <span className="max-w-lg text-sm text-destructive">{generationError ?? "Erreur de generation."}</span>
+            <span className="max-w-lg text-sm text-destructive">{generationError ?? "Erreur de génération."}</span>
           )}
           <button
             type="button"
@@ -432,7 +409,7 @@ const ReportEditorEolien = () => {
             disabled={generationState === "loading"}
             className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-70"
           >
-            {generationState === "loading" ? "Generation en cours..." : "Generer le PDF"}
+            {generationState === "loading" ? "Génération en cours..." : "Générer le rapport PDF"}
           </button>
         </div>
       </section>

@@ -21,8 +21,6 @@ def _sample_payload() -> dict:
         "metadata": {
             "title": "Rapport test",
             "ue": "WEEX",
-            "subject": "Sujet test",
-            "teacher": "Prof Test",
             "students": ["Etudiant Test"],
         },
         "genericSections": {

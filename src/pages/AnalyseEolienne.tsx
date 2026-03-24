@@ -120,7 +120,7 @@ const AnalyseEolienne = () => {
           signal: controller.signal,
         });
         if (!response.ok) {
-          throw new Error("Impossible de recuperer l'analyse depuis le serveur FastAPI.");
+          throw new Error("Impossible de récupérer l'analyse depuis le serveur FastAPI.");
         }
         const payload = (await response.json()) as AnalysisPayload;
         setAnalysis(payload);
@@ -153,45 +153,45 @@ const AnalyseEolienne = () => {
   const kpiCards = [
     {
       icon: BarChart3,
-      label: "Disponibilite",
+      label: "Disponibilité",
       value: `${currentData.kpis.availability}%`,
       color: "text-chart-1",
-      help: "Part des enregistrements ou status=1 (machine en fonctionnement). C'est un proxy de disponibilite operationnelle.",
+      help: "Part des enregistrements où status=1 (machine en fonctionnement). C'est un proxy de disponibilité opérationnelle.",
     },
     {
       icon: Zap,
       label: "Puissance nominale",
       value: `${currentData.kpis.ratedPower} MW`,
       color: "text-chart-1",
-      help: "Puissance maximale atteinte en exploitation. Elle sert de reference pour evaluer les performances relatives.",
+      help: "Puissance maximale atteinte en exploitation. Elle sert de référence pour évaluer les performances relatives.",
     },
     {
       icon: Wind,
-      label: "Vitesse demarrage",
+      label: "Vitesse démarrage",
       value: `${currentData.kpis.cutInSpeed} m/s`,
       color: "text-chart-2",
-      help: "Seuil de vent a partir duquel la turbine produit de l'energie utile.",
+      help: "Seuil de vent à partir duquel la turbine produit de l'énergie utile.",
     },
     {
       icon: Gauge,
       label: "Vitesse nominale",
       value: `${currentData.kpis.ratedSpeed} m/s`,
       color: "text-chart-3",
-      help: "Vitesse de vent ou la puissance nominale est atteinte puis regulee.",
+      help: "Vitesse de vent où la puissance nominale est atteinte puis régulée.",
     },
     {
       icon: Activity,
-      label: "Facteur de capacite",
+      label: "Facteur de capacité",
       value: `${(currentData.kpis.capacityFactor * 100).toFixed(0)}%`,
       color: "text-chart-5",
-      help: "Ratio entre production moyenne et production theorique nominale. Mesure directe du niveau d'exploitation du parc.",
+      help: "Ratio entre production moyenne et production théorique nominale. Mesure directe du niveau d'exploitation du parc.",
     },
     {
       icon: Thermometer,
       label: "Weibull k / c",
       value: `${currentData.kpis.weibullK} / ${currentData.kpis.weibullC}`,
       color: "text-chart-2",
-      help: "Parametres de distribution du vent: k (forme) et c (echelle). Ils servent a la modelisation du productible.",
+      help: "Paramètres de distribution du vent : k (forme) et c (échelle). Ils servent à la modélisation du productible.",
     },
   ];
 
@@ -253,7 +253,7 @@ const AnalyseEolienne = () => {
         <CheckCircle className="h-5 w-5 text-chart-2" />
         <div className="flex-1">
           <h2 className="font-display text-xl font-semibold text-foreground">
-            Analyse éolienne — donnees.txt
+            Analyse éolienne — données.txt
           </h2>
           <p className="text-sm text-muted-foreground">
             {currentData.kpis.totalMeasurements.toLocaleString()} mesures · {currentData.kpis.retainedMeasurements.toLocaleString()} retenues (status=1) · Script: main_louis.ipynb
@@ -263,7 +263,7 @@ const AnalyseEolienne = () => {
           to="/rapport/eolien"
           className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
         >
-          Ouvrir l'editeur de rapport
+          Ouvrir l'éditeur de rapport
         </Link>
       </div>
       {loading && (
@@ -273,7 +273,7 @@ const AnalyseEolienne = () => {
       )}
       {error && (
         <div className="glass-card p-3 text-sm text-destructive">
-          {error} Affichage des donnees locales de secours.
+          {error} Affichage des données locales de secours.
         </div>
       )}
 
@@ -406,12 +406,12 @@ const AnalyseEolienne = () => {
               {[
                 ["Mesures totales", currentData.kpis.totalMeasurements.toLocaleString()],
                 ["Mesures retenues", currentData.kpis.retainedMeasurements.toLocaleString()],
-                ["Disponibilite machine", `${currentData.kpis.availability}%`],
-                ["Puissance a 0 W", `${currentData.kpis.zeroPowerRatio}%`],
+                ["Disponibilité machine", `${currentData.kpis.availability}%`],
+                ["Puissance à 0 W", `${currentData.kpis.zeroPowerRatio}%`],
                 ["Puissance nominale", `${currentData.kpis.ratedPower} MW`],
-                ["Vitesse de demarrage", `${currentData.kpis.cutInSpeed} m/s`],
+                ["Vitesse de démarrage", `${currentData.kpis.cutInSpeed} m/s`],
                 ["Vitesse nominale", `${currentData.kpis.ratedSpeed} m/s`],
-                ["Facteur de capacite", `${(currentData.kpis.capacityFactor * 100).toFixed(0)}%`],
+                ["Facteur de capacité", `${(currentData.kpis.capacityFactor * 100).toFixed(0)}%`],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
                   <span className="text-muted-foreground">{label}</span>
@@ -479,7 +479,7 @@ const AnalyseEolienne = () => {
         </ChartCard>
         <ChartCard
           title="Puissance moyenne par direction"
-          purpose="Met en évidence les directions qui apportent le plus d'energie, pour détecter des masques de vent ou pertes directionnelles."
+          purpose="Met en évidence les directions qui apportent le plus d'énergie, pour détecter des masques de vent ou pertes directionnelles."
         >
           <ResponsiveContainer width="100%" height={300}>
             <RadarChart data={currentData.windRoseData} cx="50%" cy="50%" outerRadius="75%">
@@ -494,7 +494,7 @@ const AnalyseEolienne = () => {
 
         <ChartCard
           title="Densité de l'air"
-          purpose="Quantifie la variabilité de rho (kg/m^3), variable clé de la puissance aerodynamique; utile pour contextualiser les écarts de production."
+          purpose="Quantifie la variabilité de rho (kg/m^3), variable clé de la puissance aérodynamique ; utile pour contextualiser les écarts de production."
         >
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={currentData.airDensityData}>

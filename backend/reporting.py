@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import re
 import shutil
 import subprocess
@@ -15,15 +16,15 @@ from pydantic import BaseModel, Field
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = ROOT_DIR / "backend" / "latex_templates"
-LATEX_TIMEOUT_SECONDS = 40
+# First compilation with Tectonic may download LaTeX bundles and can be slow.
+# Keep a generous default timeout; override via WEEX_LATEX_TIMEOUT_SECONDS.
+LATEX_TIMEOUT_SECONDS = int(os.getenv("WEEX_LATEX_TIMEOUT_SECONDS", "240"))
 MAX_IMAGE_BYTES = 6 * 1024 * 1024
 
 
 class ReportMetadata(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     ue: str = Field(min_length=1, max_length=100)
-    subject: str = Field(min_length=1, max_length=200)
-    teacher: str = Field(min_length=1, max_length=200)
     students: list[str] = Field(min_length=1, max_length=10)
 
 
@@ -114,7 +115,16 @@ def _decode_chart_images(chart_sections: list[ChartSection], images_dir: Path) -
 def _render_tex(payload: EolienReportPayload, figure_context: list[dict[str, str]]) -> str:
     env = _build_jinja()
     template = env.get_template("eolien_report.tex.j2")
-    return template.render(payload=payload, figures=figure_context)
+    class_name = "rapportECL" if (TEMPLATE_DIR / "rapportECL.cls").exists() else "placeholder"
+    has_biblio = (TEMPLATE_DIR / "biblio.bib").exists() and bool(shutil.which("biber"))
+    students_block = r" \\ ".join(escape_latex(student) for student in payload.metadata.students)
+    return template.render(
+        payload=payload,
+        figures=figure_context,
+        class_name=class_name,
+        has_biblio=has_biblio,
+        students_block=students_block,
+    )
 
 
 def _latex_command() -> list[str]:
@@ -137,6 +147,28 @@ def compile_report_to_pdf(payload: EolienReportPayload) -> tuple[bytes, str]:
     images_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        class_candidates = ["rapportECL.cls", "placeholder.cls"]
+        copied_any_class = False
+        for class_filename in class_candidates:
+            class_path = TEMPLATE_DIR / class_filename
+            if class_path.exists():
+                shutil.copy2(class_path, temp_dir / class_filename)
+                copied_any_class = True
+
+        if not copied_any_class:
+            raise HTTPException(
+                status_code=500,
+                detail="Template LaTeX introuvable: ajoutez rapportECL.cls ou placeholder.cls dans backend/latex_templates.",
+            )
+
+        logos_src = TEMPLATE_DIR / "logos"
+        if logos_src.exists() and logos_src.is_dir():
+            shutil.copytree(logos_src, temp_dir / "logos", dirs_exist_ok=True)
+
+        biblio_src = TEMPLATE_DIR / "biblio.bib"
+        if biblio_src.exists():
+            shutil.copy2(biblio_src, temp_dir / "biblio.bib")
+
         figures = _decode_chart_images(payload.chartSections, images_dir)
         tex_source = _render_tex(payload, figures)
         tex_path = temp_dir / "report.tex"

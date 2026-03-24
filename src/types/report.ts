@@ -36,8 +36,6 @@ export type EolienReportPayload = {
   metadata: {
     title: string;
     ue: string;
-    subject: string;
-    teacher: string;
     students: string[];
   };
   genericSections: {
