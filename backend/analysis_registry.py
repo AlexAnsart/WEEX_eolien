@@ -37,11 +37,16 @@ def analyse_main() -> dict[str, Any]:
     return _run_standard_notebook_analysis("script/main.ipynb")
 
 
+def analyse_main_eolien() -> dict[str, Any]:
+    return _run_standard_notebook_analysis("script/main_eolien.py")
+
+
 ANALYSIS_HANDLERS: dict[str, Callable[[], dict[str, Any]]] = {
     "main-louis": analyse_main_louis,
     "main-adil": analyse_main_adil,
     "main-jules": analyse_main_jules,
     "main": analyse_main,
+    "main-eolien": analyse_main_eolien,
 }
 
 
