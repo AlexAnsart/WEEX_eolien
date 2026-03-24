@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
 import shutil
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
@@ -9,6 +13,8 @@ from fastapi.responses import Response
 
 from .analysis_registry import ANALYSIS_HANDLERS, run_analysis
 from .reporting import EolienReportPayload, compile_report_to_pdf
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
 app = FastAPI(title="WEEX Eolien API", version="1.0.0")
@@ -44,6 +50,29 @@ def analyse_by_id(analysis_id: str) -> dict[str, Any]:
 def analyse_main_louis() -> dict[str, Any]:
     # Legacy endpoint kept for frontend compatibility.
     return run_analysis("main-louis")
+
+
+@app.post("/api/analyse/main-eolien/images")
+def generate_main_eolien_images() -> dict[str, Any]:
+    script_path = ROOT_DIR / "script" / "main_eolien.py"
+    data_path = ROOT_DIR / "script" / "donnees.txt"
+    output_path = ROOT_DIR / "public" / "generated"
+    cmd = [
+        sys.executable,
+        str(script_path),
+        "--data",
+        str(data_path),
+        "--output",
+        str(output_path),
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    payload = json.loads(result.stdout.strip() or "{}")
+    return {
+        "sourceScript": "script/main_eolien.py",
+        "outputDir": "public/generated",
+        "images": payload,
+    }
 
 
 @app.post("/api/reports/eolien/generate")

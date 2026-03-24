@@ -4,11 +4,6 @@ import { Link } from "react-router-dom";
 import {
   Wind, Zap, Gauge, Thermometer, Activity, BarChart3, Upload, CheckCircle,
 } from "lucide-react";
-import {
-  Line, LineChart, BarChart, Bar, ComposedChart,
-  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
-  ScatterChart, Scatter, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-} from "recharts";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   powerCurveData, windDistributionData, windRoseData,
@@ -17,67 +12,7 @@ import {
 import { saveAnalysisSnapshot } from "@/lib/report";
 import type { AnalysisPayload } from "@/types/report";
 
-type AnalysisTab = "performance" | "weibull" | "atmosphere";
-
-const chartLegendStyle = {
-  color: "hsl(var(--muted-foreground))",
-  fontSize: 12,
-};
-
-const axisLabelProps = {
-  fill: "hsl(var(--muted-foreground))",
-  fontSize: 12,
-  textAnchor: "middle" as const,
-};
-
-const powerCurveGridProps = {
-  stroke: "hsl(var(--foreground))",
-  strokeOpacity: 0.22,
-  strokeDasharray: "3 3",
-};
-
-const weibullPdf = (v: number, k: number, c: number) => {
-  if (v < 0 || k <= 0 || c <= 0) {
-    return 0;
-  }
-  const vc = v / c;
-  return (k / c) * (vc ** (k - 1)) * Math.exp(-(vc ** k));
-};
-
-const weibullCdf = (v: number, k: number, c: number) => {
-  if (v <= 0 || k <= 0 || c <= 0) {
-    return 0;
-  }
-  return 1 - Math.exp(-((v / c) ** k));
-};
-
-const parseBinBounds = (range: string): { left: number; right: number | null } | null => {
-  if (range.includes("-")) {
-    const [leftRaw, rightRaw] = range.split("-");
-    const left = Number(leftRaw);
-    const right = Number(rightRaw);
-    if (!Number.isNaN(left) && !Number.isNaN(right)) {
-      return { left, right };
-    }
-  }
-
-  if (range.endsWith("+")) {
-    const left = Number(range.slice(0, -1));
-    if (!Number.isNaN(left)) {
-      return { left, right: null };
-    }
-  }
-  return null;
-};
-
-const estimateBinWidth = (ranges: string[]): number => {
-  const widths = ranges
-    .map((range) => parseBinBounds(range))
-    .filter((bin): bin is { left: number; right: number } => !!bin && bin.right !== null)
-    .map((bin) => bin.right - bin.left)
-    .filter((width) => width > 0);
-  return widths.length > 0 ? widths[0] : 1;
-};
+type AnalysisTab = "performance" | "weibull" | "direction" | "temperature";
 
 const ChartCard = ({
   title,
@@ -99,12 +34,25 @@ const ChartCard = ({
   </div>
 );
 
+const ImageChart = ({
+  src,
+  alt,
+}: {
+  src: string;
+  alt: string;
+}) => (
+  <div className="overflow-hidden rounded-lg border border-border bg-background/60 p-2">
+    <img src={src} alt={alt} className="h-auto w-full rounded-md" loading="lazy" />
+  </div>
+);
+
 const AnalyseEolienne = () => {
   const [loaded, setLoaded] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AnalysisTab>("performance");
+  const [imageStamp, setImageStamp] = useState<number>(Date.now());
 
   useEffect(() => {
     if (!loaded) {
@@ -116,7 +64,12 @@ const AnalyseEolienne = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch("http://127.0.0.1:8000/api/analyse/main-louis", {
+        await fetch("http://127.0.0.1:8000/api/analyse/main-eolien/images", {
+          method: "POST",
+          signal: controller.signal,
+        });
+        setImageStamp(Date.now());
+        const response = await fetch("http://127.0.0.1:8000/api/analyse/main-eolien", {
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -195,25 +148,20 @@ const AnalyseEolienne = () => {
     },
   ];
 
-  const windBinWidth = estimateBinWidth(currentData.windDistributionData.map((bin) => bin.range));
-
-  const weibullDistributionData = currentData.windDistributionData
-    .map((bin) => {
-      const bounds = parseBinBounds(bin.range);
-      if (!bounds) {
-        return null;
-      }
-      const left = bounds.left;
-      const right = bounds.right ?? (bounds.left + windBinWidth);
-      const weibullPct = (weibullCdf(right, currentData.kpis.weibullK, currentData.kpis.weibullC)
-        - weibullCdf(left, currentData.kpis.weibullK, currentData.kpis.weibullC)) * 100;
-      return {
-        range: bin.range,
-        observedPct: bin.pct,
-        weibullPct: Number(weibullPct.toFixed(2)),
-      };
-    })
-    .filter((v): v is { range: string; observedPct: number; weibullPct: number } => v !== null);
+  const imageBase = `/generated`;
+  const imageSrc = {
+    powerCurve: `${imageBase}/courbe_puissance.png?t=${imageStamp}`,
+    powerCurveScatter: `${imageBase}/puissance_vitesse_brut.png?t=${imageStamp}`,
+    powerCurveFitOnly: `${imageBase}/courbe_puissance_ajustee.png?t=${imageStamp}`,
+    powerCurveEtaTop: `${imageBase}/courbe_puissance_regression_eta.png?t=${imageStamp}`,
+    powerCurveEtaResiduals: `${imageBase}/residus_modele_puissance.png?t=${imageStamp}`,
+    windPowerScatter: `${imageBase}/nuage_puissance_vent.png?t=${imageStamp}`,
+    tempPowerScatter: `${imageBase}/temperature_puissance_brut.png?t=${imageStamp}`,
+    tempPowerRegression: `${imageBase}/temperature_puissance_regression.png?t=${imageStamp}`,
+    weibullDistribution: `${imageBase}/distribution_weibull.png?t=${imageStamp}`,
+    windRoseFrequency: `${imageBase}/rose_vents_frequence.png?t=${imageStamp}`,
+    windRosePower: `${imageBase}/rose_vents_puissance.png?t=${imageStamp}`,
+  };
 
   if (!loaded) {
     return (
@@ -239,7 +187,7 @@ const AnalyseEolienne = () => {
             Charger donnees.txt
           </button>
           <p className="mt-3 text-xs text-muted-foreground">
-            19 918 mesures · 6 variables · Analyse via main_louis.ipynb
+            19 918 mesures · 6 variables · Analyse via main_eolien.py
           </p>
         </motion.div>
       </div>
@@ -253,11 +201,8 @@ const AnalyseEolienne = () => {
         <CheckCircle className="h-5 w-5 text-chart-2" />
         <div className="flex-1">
           <h2 className="font-display text-xl font-semibold text-foreground">
-            Analyse éolienne — données.txt
+            Analyse éolienne via données.txt
           </h2>
-          <p className="text-sm text-muted-foreground">
-            {currentData.kpis.totalMeasurements.toLocaleString()} mesures · {currentData.kpis.retainedMeasurements.toLocaleString()} retenues (status=1) · Script: main_louis.ipynb
-          </p>
         </div>
         <Link
           to="/rapport/eolien"
@@ -276,11 +221,6 @@ const AnalyseEolienne = () => {
           {error} Affichage des données locales de secours.
         </div>
       )}
-
-      <div className="glass-card p-4 text-sm text-muted-foreground">
-        Référence méthode : <span className="font-medium text-foreground">{currentData.sourceNotebook}</span> ·{" "}
-        <span className="font-medium text-foreground">{currentData.sourceDataFile}</span>
-      </div>
 
       {/* KPIs détaillés */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
@@ -307,35 +247,15 @@ const AnalyseEolienne = () => {
         ))}
       </div>
 
-      {/* Méthodologie */}
-      <div className="glass-card p-5">
-        <h3 className="font-display text-base font-semibold text-foreground">Méthodologie d&apos;analyse</h3>
-        <div className="mt-3 grid gap-3 text-sm text-muted-foreground md:grid-cols-4">
-          <div className="rounded-lg bg-muted/40 p-3">
-            <p className="font-medium text-foreground">1) Qualification des données</p>
-            <p>Filtrage des mesures sur status=1, conversion numérique, contrôle des colonnes critiques.</p>
-          </div>
-          <div className="rounded-lg bg-muted/40 p-3">
-            <p className="font-medium text-foreground">2) Physique atmosphérique</p>
-            <p>Calcul de densité de l&apos;air rho = P/(R*T), puis estimation du potentiel rho.v^3.</p>
-          </div>
-          <div className="rounded-lg bg-muted/40 p-3">
-            <p className="font-medium text-foreground">3) Performance machine</p>
-            <p>Courbe P(V) (médiane, Q10, Q90), repérage V démarrage et V nominale.</p>
-          </div>
-          <div className="rounded-lg bg-muted/40 p-3">
-            <p className="font-medium text-foreground">4) Ressource vent</p>
-            <p>Distribution empirique des vitesses et ajustement par Weibull (k, c) pour projection énergétique.</p>
-          </div>
-        </div>
-      </div>
+      
 
       <div className="border-b border-border">
         <div className="flex flex-wrap gap-1">
           {[
             { id: "performance", label: "Performance machine" },
-            { id: "weibull", label: "Ressource vent et Weibull" },
-            { id: "atmosphere", label: "Direction et atmosphère" },
+            { id: "weibull", label: "Ressource vent" },
+            { id: "direction", label: "Direction du vent" },
+            { id: "temperature", label: "Température" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -356,68 +276,19 @@ const AnalyseEolienne = () => {
       {activeTab === "performance" && (
         <div className="grid gap-6 lg:grid-cols-2">
           <ChartCard
-            title="Courbe de puissance expérimentale"
-            purpose="Lecture simplifiée de la courbe de puissance (médiane) avec bornes Q10/Q90 pour estimer la dispersion."
+            title="Puissance vs vitesse (données brutes)"
+            purpose="Visualisation directe des points de mesure pour conserver le niveau de détail du calcul Python."
           >
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={currentData.powerCurveData}>
-                <CartesianGrid {...powerCurveGridProps} />
-                <XAxis dataKey="speed" label={{ value: "Vent [m/s]", position: "insideBottom", offset: -5, ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis label={{ value: "MW", angle: -90, position: "insideLeft", ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-                <Line
-                  type="monotone"
-                  dataKey="q90"
-                  stroke="hsl(var(--chart-1))"
-                  strokeOpacity={0.45}
-                  strokeWidth={1.5}
-                  strokeDasharray="6 4"
-                  dot={false}
-                  name="Q90"
-                  isAnimationActive={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="q10"
-                  stroke="hsl(var(--chart-1))"
-                  strokeOpacity={0.45}
-                  strokeWidth={1.5}
-                  strokeDasharray="6 4"
-                  dot={false}
-                  name="Q10"
-                  isAnimationActive={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="power"
-                  stroke="hsl(var(--chart-1))"
-                  strokeWidth={2.8}
-                  dot={false}
-                  name="Médiane"
-                  animationDuration={450}
-                  animationEasing="ease-out"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <ImageChart src={imageSrc.powerCurveScatter} alt="Nuage brut puissance en fonction de la vitesse du vent" />
           </ChartCard>
 
-          <ChartCard title="Synthèse opérationnelle" purpose="Consolide les indicateurs pour décision de conduite, maintenance et benchmark inter-sites.">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              {[
-                ["Mesures totales", currentData.kpis.totalMeasurements.toLocaleString()],
-                ["Mesures retenues", currentData.kpis.retainedMeasurements.toLocaleString()],
-                ["Disponibilité machine", `${currentData.kpis.availability}%`],
-                ["Puissance à 0 W", `${currentData.kpis.zeroPowerRatio}%`],
-                ["Puissance nominale", `${currentData.kpis.ratedPower} MW`],
-                ["Vitesse de démarrage", `${currentData.kpis.cutInSpeed} m/s`],
-                ["Vitesse nominale", `${currentData.kpis.ratedSpeed} m/s`],
-                ["Facteur de capacité", `${(currentData.kpis.capacityFactor * 100).toFixed(0)}%`],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="font-medium text-foreground">{value}</span>
-                </div>
-              ))}
+          <ChartCard
+            title="Ajustement sur eta"
+            purpose="Courbe de puissance ajustée (haut) et résidus du modèle (bas)."
+          >
+            <div className="grid gap-4">
+              <ImageChart src={imageSrc.powerCurveEtaTop} alt="Courbe de puissance avec regression sur eta" />
+              <ImageChart src={imageSrc.powerCurveEtaResiduals} alt="Residus de l'ajustement sur eta" />
             </div>
           </ChartCard>
         </div>
@@ -426,123 +297,68 @@ const AnalyseEolienne = () => {
       {activeTab === "weibull" && (
         <div className="grid gap-6 lg:grid-cols-2">
         <ChartCard
-          title="Distribution observée vs ajustement Weibull"
-          purpose="Vérifie la cohérence statistique de la ressource vent; indispensable pour extrapoler la production annuelle."
+          title="Probabilité de vitesse du vent (image Python)"
+          purpose="Distribution observée des vitesses et courbe Weibull ajustée sur les données de site."
         >
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={weibullDistributionData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="range" interval={1} label={{ value: "Classes de vitesse [m/s]", position: "insideBottom", offset: -5, ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis label={{ value: "Fréquence [%]", angle: -90, position: "insideLeft", ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-              <Legend verticalAlign="top" height={28} wrapperStyle={chartLegendStyle} />
-              <Bar dataKey="observedPct" barSize={12} fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} name="Fréquence observée" />
-              <Line dataKey="weibullPct" type="monotone" stroke="hsl(var(--chart-3))" strokeWidth={2.5} dot={false} name={`Weibull k=${currentData.kpis.weibullK}, c=${currentData.kpis.weibullC}`} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <ImageChart src={imageSrc.weibullDistribution} alt="Distribution des vitesses et ajustement Weibull générés en Python" />
         </ChartCard>
 
         <ChartCard
-          title="Distribution du vent (comptages)"
-          purpose="Indique le régime de fonctionnement le plus fréquent de l'éolienne pour dimensionner l'exploitation."
+          title="Méthodologie d'ajustement"
+          purpose="Démarche utilisée pour obtenir une courbe stable et physiquement cohérente."
         >
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={currentData.windDistributionData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="range" interval={1} label={{ value: "Classes de vitesse [m/s]", position: "insideBottom", offset: -5, ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis label={{ value: "Nombre de mesures", angle: -90, position: "insideLeft", ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-              <Legend verticalAlign="top" height={28} wrapperStyle={chartLegendStyle} />
-              <Bar dataKey="count" barSize={12} fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} name="Nb mesures" />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div className="rounded-lg bg-muted/50 p-3">
+              1) Nettoyage des données, conversion numérique et filtrage sur <span className="font-medium text-foreground">status=1</span>.
+            </div>
+            <div className="rounded-lg bg-muted/50 p-3">
+              2) Binning de la vitesse (pas 1 m/s), calcul moyenne et écart-type de puissance par classe.
+            </div>
+            <div className="rounded-lg bg-muted/50 p-3">
+              3) Ajustement sur la zone productive (hors bas régime et hors plateau nominal) puis saturation au nominal observé.
+            </div>
+            <div className="rounded-lg bg-muted/50 p-3">
+              4) Ajustement Weibull par méthode des moments (paramètres <span className="font-medium text-foreground">k</span> et <span className="font-medium text-foreground">c</span>) et comparaison à l'histogramme observé.
+            </div>
+          </div>
         </ChartCard>
         </div>
       )}
 
-      {activeTab === "atmosphere" && (
-        <>
-          <div className="grid gap-6 lg:grid-cols-3">
-        <ChartCard
-          title="Rose des vents (fréquence %)"
-          purpose="Identifie les directions dominantes de vent pour relier l'environnement du site aux performances et aux contraintes d'implantation."
-        >
-          <ResponsiveContainer width="100%" height={300}>
-            <RadarChart data={currentData.windRoseData} cx="50%" cy="50%" outerRadius="75%">
-              <PolarGrid stroke="hsl(var(--border))" />
-              <PolarAngleAxis dataKey="dir" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              <PolarRadiusAxis tick={{ fontSize: 10 }} stroke="hsl(var(--border))" />
-              <Radar name="Fréquence" dataKey="freq" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.25} />
-              <Legend wrapperStyle={chartLegendStyle} />
-            </RadarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-        <ChartCard
-          title="Puissance moyenne par direction"
-          purpose="Met en évidence les directions qui apportent le plus d'énergie, pour détecter des masques de vent ou pertes directionnelles."
-        >
-          <ResponsiveContainer width="100%" height={300}>
-            <RadarChart data={currentData.windRoseData} cx="50%" cy="50%" outerRadius="75%">
-              <PolarGrid stroke="hsl(var(--border))" />
-              <PolarAngleAxis dataKey="dir" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              <PolarRadiusAxis tick={{ fontSize: 10 }} stroke="hsl(var(--border))" />
-              <Radar name="Puissance moy. (kW)" dataKey="avgPower" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.25} />
-              <Legend wrapperStyle={chartLegendStyle} />
-            </RadarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+      {activeTab === "direction" && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartCard
+            title="Rose des vents (fréquence)"
+            purpose="Répartition directionnelle de la ressource en vent."
+          >
+            <ImageChart src={imageSrc.windRoseFrequency} alt="Rose des vents en fréquence" />
+          </ChartCard>
 
-        <ChartCard
-          title="Densité de l'air"
-          purpose="Quantifie la variabilité de rho (kg/m^3), variable clé de la puissance aérodynamique ; utile pour contextualiser les écarts de production."
-        >
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={currentData.airDensityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="density" label={{ value: "Classes de densité [kg/m^3]", position: "insideBottom", offset: 4, ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={10} angle={-30} textAnchor="end" height={58} />
-              <YAxis label={{ value: "Nombre de mesures", angle: -90, position: "insideLeft", ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-              <Legend verticalAlign="top" height={28} wrapperStyle={chartLegendStyle} />
-              <Bar dataKey="count" barSize={10} fill="hsl(var(--chart-5))" radius={[3, 3, 0, 0]} name="Nb mesures" />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
+          <ChartCard
+            title="Rose directionnelle de puissance"
+            purpose="Puissance moyenne associée à chaque secteur directionnel."
+          >
+            <ImageChart src={imageSrc.windRosePower} alt="Rose directionnelle de puissance moyenne" />
+          </ChartCard>
+        </div>
+      )}
 
-          <div className="grid gap-6 lg:grid-cols-2">
-        <ChartCard
-          title="Effet de la température sur la densité de puissance"
-          purpose="Montre l'impact thermique sur le potentiel énergétique (rho.v^3 normalisé), pour distinguer effet météo et performance machine."
-        >
-          <ResponsiveContainer width="100%" height={260}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="temp" name="Temp °C" stroke="hsl(var(--muted-foreground))" fontSize={12} label={{ value: "Température [°C]", position: "insideBottom", offset: -5, ...axisLabelProps }} />
-              <YAxis dataKey="power" name="rho.v^3 norm." label={{ value: "rho.v^3 normalisé [-]", angle: -90, position: "insideLeft", ...axisLabelProps }} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
-              <Scatter data={currentData.tempPowerData} fill="hsl(var(--chart-4))" name="ρ·v³ normalisé" />
-              <Legend verticalAlign="top" height={28} wrapperStyle={chartLegendStyle} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </ChartCard>
+      {activeTab === "temperature" && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartCard
+            title="Température vs puissance (image Python)"
+            purpose="Graphique généré côté Python pour lire plus finement la dispersion thermique."
+          >
+            <ImageChart src={imageSrc.tempPowerScatter} alt="Nuage de points température versus puissance généré en Python" />
+          </ChartCard>
 
-        <ChartCard title="Paramètres de modélisation Weibull" purpose="Rappel des paramètres utilisés pour l'ajustement de distribution et la projection du productible.">
-          <div className="space-y-3 text-sm">
-            <div className="rounded-lg bg-muted/50 px-3 py-2">
-              <p className="text-muted-foreground">Paramètre de forme (k)</p>
-              <p className="font-medium text-foreground">{currentData.kpis.weibullK}</p>
-            </div>
-            <div className="rounded-lg bg-muted/50 px-3 py-2">
-              <p className="text-muted-foreground">Paramètre d&apos;échelle (c)</p>
-              <p className="font-medium text-foreground">{currentData.kpis.weibullC} m/s</p>
-            </div>
-            <div className="rounded-lg bg-muted/50 px-3 py-2 text-muted-foreground">
-              La superposition histogramme / Weibull permet de vérifier que le modèle statistique reste fidèle aux fréquences observées sur site.
-            </div>
-          </div>
-        </ChartCard>
-      </div>
-        </>
+          <ChartCard
+            title="Régression linéaire à vitesse constante"
+            purpose="Effet thermique estimé pour des vitesses de vent fixes, avec droites de régression."
+          >
+            <ImageChart src={imageSrc.tempPowerRegression} alt="Régressions linéaires de la puissance selon la température à vitesse constante" />
+          </ChartCard>
+        </div>
       )}
     </div>
   );
