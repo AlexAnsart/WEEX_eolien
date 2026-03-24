@@ -20,6 +20,7 @@ const ReportEditorEolien = () => {
   const [metadata, setMetadata] = useState<EolienReportPayload["metadata"]>(defaultReportMetadata);
   const [authorsText, setAuthorsText] = useState(defaultReportMetadata.students.join("\n"));
   const [conclusionText, setConclusionText] = useState(defaultGenericSections.conclusion);
+  const [directionInterpretation, setDirectionInterpretation] = useState("");
   const [interpretations, setInterpretations] = useState<Record<string, string>>({
     powerCurve: "",
     windDistribution: "",
@@ -59,7 +60,7 @@ const ReportEditorEolien = () => {
         id: "powerCurve",
         title: "Courbe de puissance",
         caption: "Courbe de puissance issue du script Python.",
-        src: `/generated/courbe_puissance.png?t=${imageStamp}`,
+        src: `/generated/courbe_puissance_regression_eta.png?t=${imageStamp}`,
       },
       {
         id: "windDistribution",
@@ -70,20 +71,20 @@ const ReportEditorEolien = () => {
       {
         id: "windRose",
         title: "Rose des vents",
-        caption: "Fréquences directionnelles du vent.",
-        src: `/generated/rose_vents_frequence.png?t=${imageStamp}`,
-      },
-      {
-        id: "tempPower",
-        title: "Température et puissance",
-        caption: "Régression température-puissance à vitesse constante.",
-        src: `/generated/temperature_puissance_regression.png?t=${imageStamp}`,
+        caption: "Puissance moyenne associée à chaque secteur directionnel.",
+        src: `/generated/rose_vents_puissance.png?t=${imageStamp}`,
       },
       {
         id: "airDensity",
         title: "Direction et puissance",
         caption: "Dispersion de la puissance selon la direction du vent.",
         src: `/generated/direction_puissance_brut.png?t=${imageStamp}`,
+      },
+      {
+        id: "tempPower",
+        title: "Température et puissance",
+        caption: "Régression température-puissance à vitesse constante.",
+        src: `/generated/temperature_puissance_regression.png?t=${imageStamp}`,
       },
     ] as const,
     [imageStamp],
@@ -113,7 +114,10 @@ const ReportEditorEolien = () => {
         id: spec.id,
         title: spec.title,
         caption: spec.caption,
-        interpretation: interpretations[spec.id] ?? "",
+        interpretation:
+          spec.id === "airDensity" || spec.id === "windRose"
+            ? directionInterpretation
+            : (interpretations[spec.id] ?? ""),
         imageBase64,
       });
     }
@@ -222,27 +226,60 @@ const ReportEditorEolien = () => {
       <section className="grid gap-6">
         <h2 className="font-display text-lg font-semibold text-foreground">Sections analytiques modulables</h2>
 
-        {chartSpecs.map((spec, index) => (
-          <div key={spec.id} className="glass-card p-5">
-            <h3 className="mb-1 font-medium">{index + 1}. {spec.title}</h3>
-            <p className="mb-3 text-sm text-muted-foreground">{spec.caption}</p>
-            <div className="rounded border border-border bg-background p-2">
-              <img
-                src={spec.src}
-                alt={spec.title}
-                loading="lazy"
-                className="h-auto max-h-[420px] w-full rounded object-contain"
+        {chartSpecs
+          .filter((spec) => spec.id !== "airDensity" && spec.id !== "windRose")
+          .map((spec, index) => (
+            <div key={spec.id} className="glass-card p-5">
+              <h3 className="mb-1 font-medium">{index + 1}. {spec.title}</h3>
+              <p className="mb-3 text-sm text-muted-foreground">{spec.caption}</p>
+              <div className="rounded border border-border bg-background p-2">
+                <img
+                  src={spec.src}
+                  alt={spec.title}
+                  loading="lazy"
+                  className="h-auto max-h-[420px] w-full rounded object-contain"
+                />
+              </div>
+              <textarea
+                value={interpretations[spec.id]}
+                onChange={(e) => setInterpretations((prev) => ({ ...prev, [spec.id]: e.target.value }))}
+                rows={4}
+                placeholder="Interprétation analyste"
+                className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
               />
             </div>
-            <textarea
-              value={interpretations[spec.id]}
-              onChange={(e) => setInterpretations((prev) => ({ ...prev, [spec.id]: e.target.value }))}
-              rows={4}
-              placeholder="Interprétation analyste"
-              className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
-            />
+          ))}
+
+        <div className="glass-card p-5">
+          <h3 className="mb-1 font-medium">4. Direction du vent et puissance</h3>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Vue conjointe du nuage de puissance selon la direction et de la rose directionnelle de puissance.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {chartSpecs
+              .filter((spec) => spec.id === "airDensity" || spec.id === "windRose")
+              .map((spec) => (
+                <div key={spec.id}>
+                  <p className="mb-2 text-sm font-medium text-foreground">{spec.title}</p>
+                  <div className="rounded border border-border bg-background p-2">
+                    <img
+                      src={spec.src}
+                      alt={spec.title}
+                      loading="lazy"
+                      className="h-auto max-h-[360px] w-full rounded object-contain"
+                    />
+                  </div>
+                </div>
+              ))}
           </div>
-        ))}
+          <textarea
+            value={directionInterpretation}
+            onChange={(e) => setDirectionInterpretation(e.target.value)}
+            rows={4}
+            placeholder="Interprétation analyste"
+            className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
+          />
+        </div>
       </section>
 
       <section className="glass-card grid gap-4 p-5">

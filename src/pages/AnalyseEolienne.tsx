@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
-  Wind, Zap, Gauge, Thermometer, Activity, BarChart3, Upload, CheckCircle,
+  Wind, Zap, Gauge, Activity, BarChart3, Upload, CheckCircle,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -13,6 +13,14 @@ import { saveAnalysisSnapshot } from "@/lib/report";
 import type { AnalysisPayload } from "@/types/report";
 
 type AnalysisTab = "performance" | "weibull" | "direction" | "temperature";
+
+// KPI values produced by script/main_adil_2.ipynb
+const machinePerformanceKpisFromAdil2 = {
+  cutInSpeed: 4.5, // m/s
+  ratedSpeed: 15.5, // m/s
+  maxPowerKw: 1436.8, // kW
+  efficiencyEta: 0.3966,
+};
 
 const ChartCard = ({
   title,
@@ -102,6 +110,10 @@ const AnalyseEolienne = () => {
     airDensityData,
     kpis,
   };
+  const sortedPowerCurve = [...currentData.powerCurveData].sort((a, b) => a.speed - b.speed);
+  const cutOutPoint = sortedPowerCurve.find(
+    (point) => point.speed > machinePerformanceKpisFromAdil2.ratedSpeed && point.power <= 0.01,
+  );
 
   const kpiCards = [
     {
@@ -113,38 +125,38 @@ const AnalyseEolienne = () => {
     },
     {
       icon: Zap,
-      label: "Puissance nominale",
-      value: `${currentData.kpis.ratedPower} MW`,
+      label: "Puissance maximale",
+      value: `${machinePerformanceKpisFromAdil2.maxPowerKw.toFixed(1)} kW`,
       color: "text-chart-1",
-      help: "Puissance maximale atteinte en exploitation. Elle sert de référence pour évaluer les performances relatives.",
+      help: "Puissance maximale identifiee dans main_adil_2.ipynb.",
     },
     {
       icon: Wind,
       label: "Vitesse démarrage",
-      value: `${currentData.kpis.cutInSpeed} m/s`,
+      value: `${machinePerformanceKpisFromAdil2.cutInSpeed.toFixed(1)} m/s`,
       color: "text-chart-2",
       help: "Seuil de vent à partir duquel la turbine produit de l'énergie utile.",
     },
     {
       icon: Gauge,
       label: "Vitesse nominale",
-      value: `${currentData.kpis.ratedSpeed} m/s`,
+      value: `${machinePerformanceKpisFromAdil2.ratedSpeed.toFixed(1)} m/s`,
       color: "text-chart-3",
       help: "Vitesse de vent où la puissance nominale est atteinte puis régulée.",
     },
     {
-      icon: Activity,
-      label: "Facteur de capacité",
-      value: `${(currentData.kpis.capacityFactor * 100).toFixed(0)}%`,
-      color: "text-chart-5",
-      help: "Ratio entre production moyenne et production théorique nominale. Mesure directe du niveau d'exploitation du parc.",
+      icon: Gauge,
+      label: "Vitesse retour a 0",
+      value: cutOutPoint ? `${cutOutPoint.speed.toFixed(1)} m/s` : "Non observee",
+      color: "text-chart-4",
+      help: "Premiere vitesse > rated pour laquelle la puissance retombe a 0 (logique KPI precedente).",
     },
     {
-      icon: Thermometer,
-      label: "Weibull k / c",
-      value: `${currentData.kpis.weibullK} / ${currentData.kpis.weibullC}`,
-      color: "text-chart-2",
-      help: "Paramètres de distribution du vent : k (forme) et c (échelle). Ils servent à la modélisation du productible.",
+      icon: Activity,
+      label: "Rendement eta",
+      value: machinePerformanceKpisFromAdil2.efficiencyEta.toFixed(4),
+      color: "text-chart-5",
+      help: "Rendement eta estime par regression sur la zone productive [cut-in ; rated] dans main_adil_2.ipynb.",
     },
   ];
 
@@ -163,28 +175,6 @@ const AnalyseEolienne = () => {
     windRosePower: `${imageBase}/rose_vents_puissance.png?t=${imageStamp}`,
     directionPowerScatter: `${imageBase}/direction_puissance_brut.png?t=${imageStamp}`,
   };
-  const sortedPowerCurve = [...currentData.powerCurveData].sort((a, b) => a.speed - b.speed);
-  const maxPowerPoint = sortedPowerCurve.reduce(
-    (best, point) => (point.power > best.power ? point : best),
-    sortedPowerCurve[0] ?? { speed: 0, power: 0, q10: 0, q90: 0 },
-  );
-  const cutOutPoint = sortedPowerCurve.find(
-    (point) => point.speed > currentData.kpis.ratedSpeed && point.power <= 0.01,
-  );
-  const performanceHighlights = [
-    { label: "Vitesse de démarrage", value: `${currentData.kpis.cutInSpeed} m/s` },
-    { label: "Puissance maximale observée", value: `${maxPowerPoint.power.toFixed(2)} MW` },
-    { label: "Vitesse de plateau nominal", value: `${currentData.kpis.ratedSpeed} m/s` },
-    {
-      label: "Vitesse de retour à puissance nulle",
-      value: cutOutPoint ? `${cutOutPoint.speed.toFixed(1)} m/s` : "Non observée",
-    },
-    {
-      label: "Rendement (facteur de capacité)",
-      value: `${(currentData.kpis.capacityFactor * 100).toFixed(1)}%`,
-    },
-  ];
-
   if (!loaded) {
     return (
       <div className="flex flex-1 items-center justify-center px-6 py-20">
@@ -296,22 +286,7 @@ const AnalyseEolienne = () => {
       </div>
 
       {activeTab === "performance" && (
-        <div className="grid gap-6">
-          <ChartCard
-            title="Indicateurs clés de performance"
-            purpose="Repères opérationnels utiles avant la lecture des graphiques de puissance."
-          >
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              {performanceHighlights.map((item) => (
-                <div key={item.label} className="rounded-lg border border-border bg-background/70 p-3">
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
-                  <p className="mt-1 font-display text-base font-semibold text-foreground">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </ChartCard>
-
-          <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
             <ChartCard
               title="Puissance vs vitesse (données brutes)"
               purpose="Visualisation directe des points de mesure pour conserver le niveau de détail du calcul Python."
@@ -328,7 +303,6 @@ const AnalyseEolienne = () => {
                 <ImageChart src={imageSrc.powerCurveEtaResiduals} alt="Residus de l'ajustement sur eta" />
               </div>
             </ChartCard>
-          </div>
         </div>
       )}
 

@@ -1,48 +1,102 @@
 \documentclass{ {{- class_name -}} }
+\addbibresource{biblio.bib}
+
+\title{Rapport ECL - Template}
 
 \begin{document}
 
 %----------- Informations du rapport ---------
-\titre{ {{ payload.metadata.title|latex }} }
-\UE{ {{ payload.metadata.ue|latex }} }
-\sujet{}
-\enseignant{}
-\eleves{ {{ students_block }} }
+\titre{Titre du rapport}
+\UE{Weex Eolien}
+\sujet{groupe 18, Eolien type 18}
+\eleves{}
 
 %----------- Initialisation -------------------
 \fairemarges
 \fairepagedegarde
+\tabledematieres
 
-\section*{Introduction}
- \addcontentsline{toc}{section}{Introduction}
+%------------ Corps du rapport ----------------
+
+\section{Introduction}
 {{ payload.genericSections.introduction|latex }}
 
-\section{Cadre theorique}
-{{ payload.genericSections.theoreticalFramework|latex }}
+\section{Hypothèse du modèle}
+\subsection{Hypothèse n°1}
+On néglige l'impact de la couche limite sur le profil de vitesse du vent. C'est à dire que l'on considère que notre éolienne est à une hauteur suffisante pour avoir un profil de vitesse homogène dans l'espace 2D. On considérera que le
+vent est uniforme sur toute la surface stratégique de l’éolienne et que la valeur mesurée est prise à la hauteur de la nacelle
+\subsection{Hypothèse n°2}
+On alignera l’orientation
+du champ d’éolienne avec la
+direction moyenne du vent
 
-\section{Methodologie}
-{{ payload.genericSections.methodology|latex }}
+\section{Validation du modèle}
 
-\section{Synthese des indicateurs}
-\textbf{Notebook source:} {{ payload.analysisSummary.sourceNotebook|latex }} \\
-\textbf{Fichier de donnees:} {{ payload.analysisSummary.sourceDataFile|latex }} \\
-\textbf{Disponibilite:} {{ payload.analysisSummary.kpis.availability }}\% \\
-\textbf{Facteur de capacite:} {{ payload.analysisSummary.kpis.capacityFactor }} \\
-\textbf{Puissance nominale:} {{ payload.analysisSummary.kpis.ratedPower }} MW
+Pour analyser les performances de notre héolienne, on a vérifié la cohérence du modèle proposé à partir de données expérimentales. On veut donc trouver quels paramètres optimisent la production de puissance électrique.
+On suit le modèle de la limite Betz :
+\begin{equation*}
+  P = \eta \frac{16}{27} \rho \frac{1}{2} V^3 \frac{\pi D^2}{4}
+\end{equation*}
+avec :
 
-\section{Analyses graphiques}
-{% for figure in figures %}
-\subsection{ {{ payload.chartSections[loop.index0].title|latex }} }
+  D la taille de notre éolienne: D=60m dans notre cas
+
+  \(\eta \) le rendement qu'on va calculer dans la suite
+
+  \(\rho \) la masse volumique du fluide
+
+  V la vitesse du vent
+
+  Le \(\frac{16}{27}\) traduit la limite de Betz qui est une limite théorique du rendement.
+
+\subsection{La vitesse du vent}
 \begin{figure}[H]
-  \centering
-  \includegraphics[width=0.9\textwidth]{images/{{ figure.filename }}}
-  \caption{ {{ payload.chartSections[loop.index0].caption|latex }} }
+    \centering
+    \includegraphics[width=0.75\linewidth]{images/{{ figures_by_id["powerCurve"].filename }}}
+    \caption{ {{ (figures_by_id["powerCurve"].title if figures_by_id.get("powerCurve") else "")|latex }} }
+    \label{fig:vitesse-vent}
 \end{figure}
-\textbf{Interpretation analyste:} {{ payload.chartSections[loop.index0].interpretation|latex }}
-{% endfor %}
+{{ (payload.chartSections | selectattr("id", "equalto", "powerCurve") | map(attribute="interpretation") | first | default(""))|latex }}
 
+\subsection{La température}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{images/{{ figures_by_id["tempPower"].filename }}}
+    \caption{ {{ (figures_by_id["tempPower"].title if figures_by_id.get("tempPower") else "")|latex }} }
+    \label{fig:temperature-puissance}
+\end{figure}
+{{ (payload.chartSections | selectattr("id", "equalto", "tempPower") | map(attribute="interpretation") | first | default(""))|latex }}
+
+\subsection{la diretion du vent}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/{{ figures_by_id["airDensity"].filename }}}
+    \caption{ {{ (figures_by_id["airDensity"].title if figures_by_id.get("airDensity") else "")|latex }} }
+    \label{fig:direction-puissance}
+\end{figure}
+{{ (payload.chartSections | selectattr("id", "equalto", "airDensity") | map(attribute="interpretation") | first | default(""))|latex }}
+
+\section{Analyse du terrain}
+
+\subsection{anémométrie}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/{{ figures_by_id["windDistribution"].filename }}}
+    \caption{ {{ (figures_by_id["windDistribution"].title if figures_by_id.get("windDistribution") else "")|latex }} }
+    \label{fig:distribution-weibull}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/{{ figures_by_id["windRose"].filename }}}
+    \caption{ {{ (figures_by_id["windRose"].title if figures_by_id.get("windRose") else "")|latex }} }
+    \label{fig:rose-vents}
+\end{figure}
+{{ (payload.chartSections | selectattr("id", "equalto", "windDistribution") | map(attribute="interpretation") | first | default(""))|latex }}
+
+\subsection{}
 \section*{Conclusion}
 \addcontentsline{toc}{section}{Conclusion}
 {{ payload.genericSections.conclusion|latex }}
 
+\printbibliography[heading=none]
 \end{document}

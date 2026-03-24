@@ -108,7 +108,7 @@ def _decode_chart_images(chart_sections: list[ChartSection], images_dir: Path) -
         filename = f"figure_{index:02d}.png"
         image_path = images_dir / filename
         image_path.write_bytes(image_bytes)
-        figure_context.append({"filename": filename, "title": section.title})
+        figure_context.append({"id": section.id, "filename": filename, "title": section.title})
     return figure_context
 
 
@@ -118,9 +118,11 @@ def _render_tex(payload: EolienReportPayload, figure_context: list[dict[str, str
     class_name = "rapportECL" if (TEMPLATE_DIR / "rapportECL.cls").exists() else "placeholder"
     has_biblio = (TEMPLATE_DIR / "biblio.bib").exists() and bool(shutil.which("biber"))
     students_block = r" \\ ".join(escape_latex(student) for student in payload.metadata.students)
+    figures_by_id = {figure["id"]: figure for figure in figure_context}
     return template.render(
         payload=payload,
         figures=figure_context,
+        figures_by_id=figures_by_id,
         class_name=class_name,
         has_biblio=has_biblio,
         students_block=students_block,
