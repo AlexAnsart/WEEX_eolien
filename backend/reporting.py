@@ -25,7 +25,7 @@ MAX_IMAGE_BYTES = 6 * 1024 * 1024
 class ReportMetadata(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     ue: str = Field(min_length=1, max_length=100)
-    students: list[str] = Field(min_length=1, max_length=10)
+    students: list[str] = Field(default_factory=list, max_length=10)
 
 
 class GenericSections(BaseModel):
@@ -59,6 +59,16 @@ class EolienReportPayload(BaseModel):
 
 
 def escape_latex(value: str) -> str:
+    # Normalize common Unicode punctuation that pdflatex handles poorly by default.
+    value = (
+        value.replace("’", "'")
+        .replace("‘", "'")
+        .replace("“", '"')
+        .replace("”", '"')
+        .replace("–", "-")
+        .replace("—", "-")
+        .replace("\u00a0", " ")
+    )
     replacements = {
         "\\": r"\textbackslash{}",
         "&": r"\&",
@@ -108,8 +118,60 @@ def _decode_chart_images(chart_sections: list[ChartSection], images_dir: Path) -
         filename = f"figure_{index:02d}.png"
         image_path = images_dir / filename
         image_path.write_bytes(image_bytes)
-        figure_context.append({"id": section.id, "filename": filename, "title": section.title})
+        figure_context.append(
+            {
+                "id": section.id,
+                "filename": filename,
+                "title": section.title,
+                "caption": section.caption,
+                "interpretation": section.interpretation,
+            }
+        )
     return figure_context
+
+
+def _copy_static_report_images(images_dir: Path) -> None:
+    image_candidates = {
+        # intro map image provided by user
+        "carte.png": [
+            ROOT_DIR.parent / "images" / "carte.png",
+            ROOT_DIR / "images" / "carte.png",
+        ],
+        # images referenced by the requested fixed LaTeX template
+        "courbe_puissance_vitesse.png": [
+            ROOT_DIR / "public" / "generated" / "courbe_puissance_vitesse.png",
+            ROOT_DIR / "public" / "generated" / "courbe_puissance_regression_eta.png",
+            ROOT_DIR / "public" / "generated" / "courbe_puissance.png",
+        ],
+        "Figure 2026-03-24 095200.png": [
+            ROOT_DIR / "public" / "generated" / "Figure 2026-03-24 095200.png",
+            ROOT_DIR / "public" / "generated" / "temperature_puissance_regression.png",
+            ROOT_DIR / "public" / "generated" / "temperature_puissance_brut.png",
+        ],
+        "v=8.png": [
+            ROOT_DIR / "public" / "generated" / "v=8.png",
+            ROOT_DIR / "public" / "generated" / "temperature_puissance_regression.png",
+        ],
+        "v=10.png": [
+            ROOT_DIR / "public" / "generated" / "v=10.png",
+            ROOT_DIR / "public" / "generated" / "temperature_puissance_regression.png",
+        ],
+        "direction_puissance_brut.png": [
+            ROOT_DIR / "public" / "generated" / "direction_puissance_brut.png",
+        ],
+        "distribution_weibull.png": [
+            ROOT_DIR / "public" / "generated" / "distribution_weibull.png",
+        ],
+        "meteo_vectors.png": [
+            ROOT_DIR / "public" / "generated" / "meteo_vectors.png",
+        ],
+    }
+
+    for target_name, candidates in image_candidates.items():
+        for candidate in candidates:
+            if candidate.exists():
+                shutil.copy2(candidate, images_dir / target_name)
+                break
 
 
 def _render_tex(payload: EolienReportPayload, figure_context: list[dict[str, str]]) -> str:
@@ -117,7 +179,6 @@ def _render_tex(payload: EolienReportPayload, figure_context: list[dict[str, str
     template = env.get_template("eolien_report.tex.j2")
     class_name = "rapportECL" if (TEMPLATE_DIR / "rapportECL.cls").exists() else "placeholder"
     has_biblio = (TEMPLATE_DIR / "biblio.bib").exists() and bool(shutil.which("biber"))
-    students_block = r" \\ ".join(escape_latex(student) for student in payload.metadata.students)
     figures_by_id = {figure["id"]: figure for figure in figure_context}
     return template.render(
         payload=payload,
@@ -125,7 +186,6 @@ def _render_tex(payload: EolienReportPayload, figure_context: list[dict[str, str
         figures_by_id=figures_by_id,
         class_name=class_name,
         has_biblio=has_biblio,
-        students_block=students_block,
     )
 
 
@@ -172,6 +232,7 @@ def compile_report_to_pdf(payload: EolienReportPayload) -> tuple[bytes, str]:
             shutil.copy2(biblio_src, temp_dir / "biblio.bib")
 
         figures = _decode_chart_images(payload.chartSections, images_dir)
+        _copy_static_report_images(images_dir)
         tex_source = _render_tex(payload, figures)
         tex_path = temp_dir / "report.tex"
         tex_path.write_text(tex_source, encoding="utf-8")

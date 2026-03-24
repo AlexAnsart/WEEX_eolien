@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: weex-eolien-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: FRONTEND_URL
+        sync: false
+      - key: WEEX_LATEX_TIMEOUT_SECONDS
+        value: "240"
+
+  - type: web
+    name: weex-eolien-web
+    env: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false

@@ -1,15 +1,24 @@
 \documentclass{ {{- class_name -}} }
+{% if has_biblio %}
 \addbibresource{biblio.bib}
+{% endif %}
 
-\title{Rapport ECL - Template}
+\title{Rapport ECL - Template} % Titre du fichier
 
 \begin{document}
 
 %----------- Informations du rapport ---------
-\titre{Titre du rapport}
-\UE{Weex Eolien}
-\sujet{groupe 18, Eolien type 18}
-\eleves{}
+\titre{Analyse d'une éolienne type} % Titre du fichier.pdf
+\UE{Weex Eolien} % Nom de la UE
+\sujet{groupe 18, Eolienne type 18} % Nom du sujet
+\enseignant{}
+\eleves{
+{% if payload.metadata.students %}
+{% for student in payload.metadata.students %}
+{{- student|latex -}}{% if not loop.last %} \\ {% endif %}
+{% endfor %}
+{% endif %}
+}
 
 %----------- Initialisation -------------------
 \fairemarges
@@ -19,15 +28,21 @@
 %------------ Corps du rapport ----------------
 
 \section{Introduction}
-{{ payload.genericSections.introduction|latex }}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/carte.png}
+    \caption{île centrosus}
+    \label{fig:enter-label}
+\end{figure}
+ Centrosus est une magnifique petite île isolée au beau milieu de l'océan pacifique. Malheureusement, du fait de cet isolement et de difficultées d'approvisionnement, le prix de l'électricité y est extrèmement cher. Le gouvernement Centrosien cherche donc à devenir indépendant dans ce secteur et a fait pour cela appel à Groupe18. Groupe18 est une entreprise d'installation d'éoliennes, spécialisée dans les éoliennes de type 18 ( hauteur de 60 m ). Pour proposer à Centrosius le meilleur champ d'éolienne possible nous devrons étudier les performances de nos éoliennes ainsi que les caractéristiques météorologiques et anémométrique de l'île.
 
 \section{Hypothèse du modèle}
-\subsection{Hypothèse n°1}
+\subsection{Hypothèse 1}
 On néglige l'impact de la couche limite sur le profil de vitesse du vent. C'est à dire que l'on considère que notre éolienne est à une hauteur suffisante pour avoir un profil de vitesse homogène dans l'espace 2D. On considérera que le
-vent est uniforme sur toute la surface stratégique de l’éolienne et que la valeur mesurée est prise à la hauteur de la nacelle
-\subsection{Hypothèse n°2}
-On alignera l’orientation
-du champ d’éolienne avec la
+vent est uniforme sur toute la surface stratégique de l'eolienne et que la valeur mesurée est prise a la hauteur de la nacelle
+\subsection{Hypothèse 2}
+On alignera l'orientation
+du champ d'eolienne avec la
 direction moyenne du vent
 
 \section{Validation du modèle}
@@ -50,53 +65,42 @@ avec :
   Le \(\frac{16}{27}\) traduit la limite de Betz qui est une limite théorique du rendement.
 
 \subsection{La vitesse du vent}
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.75\linewidth]{images/{{ figures_by_id["powerCurve"].filename }}}
-    \caption{ {{ (figures_by_id["powerCurve"].title if figures_by_id.get("powerCurve") else "")|latex }} }
-    \label{fig:vitesse-vent}
-\end{figure}
-{{ (payload.chartSections | selectattr("id", "equalto", "powerCurve") | map(attribute="interpretation") | first | default(""))|latex }}
+Le paramètre qui devrait avoir la plus grande influence sur la puissance électrique produite est la vitesse du vent. L'éolienne s'arrète de tourner pour des vitesses de vent inférieur à 3m.\(s^{-1}\) et pour des vitesses de vent supérieurs à 15 m.\(s^{-1}\)
 
-\subsection{La température}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\linewidth]{images/{{ figures_by_id["tempPower"].filename }}}
-    \caption{ {{ (figures_by_id["tempPower"].title if figures_by_id.get("tempPower") else "")|latex }} }
-    \label{fig:temperature-puissance}
+    \includegraphics[width=0.8\linewidth]{images/{{ figures[0].filename }}}
+    \caption{ {{- figures[0].caption|latex -}} }
 \end{figure}
-{{ (payload.chartSections | selectattr("id", "equalto", "tempPower") | map(attribute="interpretation") | first | default(""))|latex }}
 
-\subsection{la diretion du vent}
+{% if figures[0].interpretation %}
+{{ figures[0].interpretation|latex }}
+{% else %}
+Les mesures experimentales suivent globalement le modele theorique. Cette section est completee par l'interpretation saisie dans la page Rapport.
+{% endif %}
+
+{% for fig in figures[1:] %}
+\subsection{ {{- fig.title|latex -}} }
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.5\linewidth]{images/{{ figures_by_id["airDensity"].filename }}}
-    \caption{ {{ (figures_by_id["airDensity"].title if figures_by_id.get("airDensity") else "")|latex }} }
-    \label{fig:direction-puissance}
+    \includegraphics[width=0.8\linewidth]{images/{{ fig.filename }}}
+    \caption{ {{- fig.caption|latex -}} }
 \end{figure}
-{{ (payload.chartSections | selectattr("id", "equalto", "airDensity") | map(attribute="interpretation") | first | default(""))|latex }}
+
+{% if fig.interpretation %}
+{{ fig.interpretation|latex }}
+{% else %}
+Interpretation a completer par l'utilisateur dans la page Rapport.
+{% endif %}
+{% endfor %}
 
 \section{Analyse du terrain}
-
-\subsection{anémométrie}
-\begin{figure}
-    \centering
-    \includegraphics[width=0.5\linewidth]{images/{{ figures_by_id["windDistribution"].filename }}}
-    \caption{ {{ (figures_by_id["windDistribution"].title if figures_by_id.get("windDistribution") else "")|latex }} }
-    \label{fig:distribution-weibull}
-\end{figure}
-\begin{figure}
-    \centering
-    \includegraphics[width=0.5\linewidth]{images/{{ figures_by_id["windRose"].filename }}}
-    \caption{ {{ (figures_by_id["windRose"].title if figures_by_id.get("windRose") else "")|latex }} }
-    \label{fig:rose-vents}
-\end{figure}
-{{ (payload.chartSections | selectattr("id", "equalto", "windDistribution") | map(attribute="interpretation") | first | default(""))|latex }}
-
-\subsection{}
-\section*{Conclusion}
+\subsection{Anemometrie}
+Les visualisations meteorologiques et energetiques sont integrees depuis les graphes de la page Analyse eolienne et documentees par les descriptions de la page Rapport.
+\section{Conclusion}
 \addcontentsline{toc}{section}{Conclusion}
-{{ payload.genericSections.conclusion|latex }}
 
+{% if has_biblio %}
 \printbibliography[heading=none]
+{% endif %}
 \end{document}

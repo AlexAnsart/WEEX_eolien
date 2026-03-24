@@ -9,6 +9,7 @@ import {
 } from "@/lib/report";
 
 type GenerationState = "idle" | "loading" | "success" | "error";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
 const ReportEditorEolien = () => {
   const [analysis, setAnalysis] = useState<AnalysisPayload | null>(null);
@@ -38,9 +39,9 @@ const ReportEditorEolien = () => {
 
     const loadFromApi = async () => {
       try {
-        await fetch("http://127.0.0.1:8000/api/analyse/main-eolien/images", { method: "POST" });
+        await fetch(`${API_BASE_URL}/api/analyse/main-eolien/images`, { method: "POST" });
         setImageStamp(Date.now());
-        const response = await fetch("http://127.0.0.1:8000/api/analyse/main-eolien");
+        const response = await fetch(`${API_BASE_URL}/api/analyse/main-eolien`);
         if (!response.ok) {
           throw new Error("Impossible de charger l'analyse éolienne.");
         }
@@ -137,10 +138,6 @@ const ReportEditorEolien = () => {
         .map((v) => v.trim())
         .filter(Boolean);
 
-      if (normalizedStudents.length === 0) {
-        throw new Error("Veuillez renseigner au moins un auteur.");
-      }
-
       const chartSections = await buildChartSections();
       const payload = buildReportPayload({
         metadata: { ...metadata, students: normalizedStudents },
@@ -152,7 +149,7 @@ const ReportEditorEolien = () => {
         chartSections,
       });
 
-      const response = await fetch("http://127.0.0.1:8000/api/reports/eolien/generate", {
+      const response = await fetch(`${API_BASE_URL}/api/reports/eolien/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

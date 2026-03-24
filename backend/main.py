@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -16,12 +17,20 @@ from .reporting import EolienReportPayload, compile_report_to_pdf
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
+raw_allowed_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+if raw_allowed_origins:
+    allowed_origins = [origin.strip() for origin in raw_allowed_origins.split(",") if origin.strip()]
+else:
+    frontend_url = os.getenv("FRONTEND_URL", "").strip()
+    allowed_origins = ["http://localhost:8080", "http://127.0.0.1:8080"]
+    if frontend_url:
+        allowed_origins.append(frontend_url)
 
 app = FastAPI(title="WEEX Eolien API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

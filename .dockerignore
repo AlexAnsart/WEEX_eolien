@@ -1,0 +1,11 @@
+.git
+.github
+node_modules
+dist
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+.cursor
+agent-transcripts

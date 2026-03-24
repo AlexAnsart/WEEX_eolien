@@ -13,6 +13,7 @@ import { saveAnalysisSnapshot } from "@/lib/report";
 import type { AnalysisPayload } from "@/types/report";
 
 type AnalysisTab = "performance" | "weibull" | "direction" | "temperature";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
 // KPI values produced by script/main_adil_2.ipynb
 const machinePerformanceKpisFromAdil2 = {
@@ -72,12 +73,12 @@ const AnalyseEolienne = () => {
       try {
         setLoading(true);
         setError(null);
-        await fetch("http://127.0.0.1:8000/api/analyse/main-eolien/images", {
+        await fetch(`${API_BASE_URL}/api/analyse/main-eolien/images`, {
           method: "POST",
           signal: controller.signal,
         });
         setImageStamp(Date.now());
-        const response = await fetch("http://127.0.0.1:8000/api/analyse/main-eolien", {
+        const response = await fetch(`${API_BASE_URL}/api/analyse/main-eolien`, {
           signal: controller.signal,
         });
         if (!response.ok) {

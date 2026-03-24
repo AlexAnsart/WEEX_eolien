@@ -67,19 +67,13 @@
     \rule{\linewidth}{0.2 mm} \\[1.5 cm]
     \vspace{1cm}%Espace de 3cm
 
-    \begin{minipage}{0.5\textwidth} %Minipage pour faire deux colonnes
+    \begin{minipage}{0.8\textwidth}
       \begin{flushleft} \large %Envoyer à gauche
         \emph{\textbf{Élèves :}}\\ %Pour le titre au dessus des noms à gauche
         \eleves %Remplacer pour chacun
       \end{flushleft}
     \end{minipage}
-    ~
-    \begin{minipage}{0.4\textwidth}
-      \begin{flushright} \large
-        \emph{\textbf{Enseignants :}} \\
-        \enseignant
-      \end{flushright}
-    \end{minipage}\\[4cm]
+    \\[4cm]
 
     \vfill
     {\large \today\par} %Affichage de la date
