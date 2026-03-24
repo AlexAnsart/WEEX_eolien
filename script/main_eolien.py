@@ -96,6 +96,7 @@ def generate_images(data_file: Path, output_dir: Path) -> dict[str, str]:
         "weibullDistribution": "distribution_weibull.png",
         "windRoseFrequency": "rose_vents_frequence.png",
         "windRosePower": "rose_vents_puissance.png",
+        "directionPowerScatter": "direction_puissance_brut.png",
     }
 
     fig, ax = plt.subplots(figsize=(11, 6))
@@ -302,9 +303,21 @@ def generate_images(data_file: Path, output_dir: Path) -> dict[str, str]:
     plt.close(fig)
 
     if direction.size > 0:
-        dir_clean = np.mod(direction, 360)
+        direction_mask = (df["status"] == 1) & np.isfinite(df["Dir_Vent_[deg]"]) & np.isfinite(df["power_w"])
+        dir_clean = np.mod(df.loc[direction_mask, "Dir_Vent_[deg]"].to_numpy(), 360)
+        puissance_dir = df.loc[direction_mask, "power_w"].to_numpy()
         bins_dir = np.arange(0, 361, 30)
         centers = np.deg2rad((bins_dir[:-1] + bins_dir[1:]) / 2)
+
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.scatter(dir_clean, puissance_dir, s=10, alpha=0.20, color="#1f77b4", edgecolors="none")
+        ax.set_xlabel("Direction du vent [deg]")
+        ax.set_ylabel("Puissance electrique [W]")
+        ax.set_title("Nuage de points : Pelec[w] en fonction de Dir_Vent_[deg]")
+        ax.grid(True, linestyle="--", alpha=0.35)
+        fig.tight_layout()
+        fig.savefig(output_dir / outputs["directionPowerScatter"], dpi=170, bbox_inches="tight")
+        plt.close(fig)
 
         counts, _ = np.histogram(dir_clean, bins=bins_dir)
         freq = counts / max(1, np.sum(counts)) * 100.0
@@ -322,7 +335,7 @@ def generate_images(data_file: Path, output_dir: Path) -> dict[str, str]:
         dir_idx = np.digitize(dir_clean, bins_dir, right=False) - 1
         dir_idx = np.clip(dir_idx, 0, 11)
         avg_power = np.array(
-            [float(np.mean(puissance[dir_idx == i])) if np.any(dir_idx == i) else 0.0 for i in range(12)]
+            [float(np.mean(puissance_dir[dir_idx == i])) if np.any(dir_idx == i) else 0.0 for i in range(12)]
         ) / 1000.0
 
         fig = plt.figure(figsize=(8, 8))

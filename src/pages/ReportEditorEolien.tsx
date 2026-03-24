@@ -1,23 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  LineChart,
-  Radar,
-  RadarChart,
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import type { AnalysisPayload, EolienReportPayload, ReportChartSection } from "@/types/report";
 import {
   buildReportPayload,
@@ -28,54 +10,12 @@ import {
 
 type GenerationState = "idle" | "loading" | "success" | "error";
 
-const axisLabelProps = {
-  fill: "hsl(var(--muted-foreground))",
-  fontSize: 12,
-  textAnchor: "middle" as const,
-};
-
-const captureChartAsBase64 = async (container: HTMLElement): Promise<string> => {
-  const svg = container.querySelector("svg");
-  if (!svg) {
-    throw new Error("Graphique introuvable pour l'export.");
-  }
-
-  const serializer = new XMLSerializer();
-  const serializedSvg = serializer.serializeToString(svg);
-  const svgBlob = new Blob([serializedSvg], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
-
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Impossible de convertir le graphique en image."));
-      img.src = url;
-    });
-
-    const width = svg.clientWidth || 900;
-    const height = svg.clientHeight || 420;
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      throw new Error("Contexte canvas indisponible.");
-    }
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(image, 0, 0, width, height);
-    return canvas.toDataURL("image/png").split(",")[1] ?? "";
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-};
-
 const ReportEditorEolien = () => {
   const [analysis, setAnalysis] = useState<AnalysisPayload | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [generationState, setGenerationState] = useState<GenerationState>("idle");
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [imageStamp, setImageStamp] = useState<number>(Date.now());
 
   const [metadata, setMetadata] = useState<EolienReportPayload["metadata"]>(defaultReportMetadata);
   const [authorsText, setAuthorsText] = useState(defaultReportMetadata.students.join("\n"));
@@ -88,14 +28,6 @@ const ReportEditorEolien = () => {
     airDensity: "",
   });
 
-  const chartRefs = {
-    powerCurve: useRef<HTMLDivElement | null>(null),
-    windDistribution: useRef<HTMLDivElement | null>(null),
-    windRose: useRef<HTMLDivElement | null>(null),
-    tempPower: useRef<HTMLDivElement | null>(null),
-    airDensity: useRef<HTMLDivElement | null>(null),
-  };
-
   useEffect(() => {
     const cached = loadAnalysisSnapshot();
     if (cached) {
@@ -105,7 +37,9 @@ const ReportEditorEolien = () => {
 
     const loadFromApi = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/analyse/main-louis");
+        await fetch("http://127.0.0.1:8000/api/analyse/main-eolien/images", { method: "POST" });
+        setImageStamp(Date.now());
+        const response = await fetch("http://127.0.0.1:8000/api/analyse/main-eolien");
         if (!response.ok) {
           throw new Error("Impossible de charger l'analyse éolienne.");
         }
@@ -121,23 +55,60 @@ const ReportEditorEolien = () => {
 
   const chartSpecs = useMemo(
     () => [
-      { id: "powerCurve", title: "Courbe de puissance", caption: "Courbe de puissance médiane avec enveloppe Q10/Q90." },
-      { id: "windDistribution", title: "Distribution des vitesses de vent", caption: "Histogramme des classes de vitesses et comparaison Weibull." },
-      { id: "windRose", title: "Rose des vents", caption: "Fréquences directionnelles et puissance moyenne par direction." },
-      { id: "tempPower", title: "Effet température vs densité de puissance", caption: "Relation entre température et potentiel aérodynamique normalisé." },
-      { id: "airDensity", title: "Distribution de densité de l'air", caption: "Histogramme des classes de densité de l'air observées." },
+      {
+        id: "powerCurve",
+        title: "Courbe de puissance",
+        caption: "Courbe de puissance issue du script Python.",
+        src: `/generated/courbe_puissance.png?t=${imageStamp}`,
+      },
+      {
+        id: "windDistribution",
+        title: "Distribution des vitesses de vent",
+        caption: "Histogramme observé et ajustement Weibull.",
+        src: `/generated/distribution_weibull.png?t=${imageStamp}`,
+      },
+      {
+        id: "windRose",
+        title: "Rose des vents",
+        caption: "Fréquences directionnelles du vent.",
+        src: `/generated/rose_vents_frequence.png?t=${imageStamp}`,
+      },
+      {
+        id: "tempPower",
+        title: "Température et puissance",
+        caption: "Régression température-puissance à vitesse constante.",
+        src: `/generated/temperature_puissance_regression.png?t=${imageStamp}`,
+      },
+      {
+        id: "airDensity",
+        title: "Direction et puissance",
+        caption: "Dispersion de la puissance selon la direction du vent.",
+        src: `/generated/direction_puissance_brut.png?t=${imageStamp}`,
+      },
     ] as const,
-    [],
+    [imageStamp],
   );
+
+  const fetchImageAsBase64 = async (url: string): Promise<string> => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Image introuvable pour l'export: ${url}`);
+    }
+    const blob = await response.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => reject(new Error("Impossible de convertir l'image en base64."));
+      reader.readAsDataURL(blob);
+    });
+    const [, base64 = ""] = dataUrl.split(",");
+    return base64;
+  };
 
   const buildChartSections = async (): Promise<ReportChartSection[]> => {
     const sections: ReportChartSection[] = [];
     for (const spec of chartSpecs) {
-      const chartContainer = chartRefs[spec.id].current;
-      if (!chartContainer) {
-        throw new Error(`Le graphique ${spec.title} n'est pas prêt pour l'export.`);
-      }
-      const imageBase64 = await captureChartAsBase64(chartContainer);
+      const imageBase64 = await fetchImageAsBase64(spec.src);
       sections.push({
         id: spec.id,
         title: spec.title,
@@ -251,122 +222,27 @@ const ReportEditorEolien = () => {
       <section className="grid gap-6">
         <h2 className="font-display text-lg font-semibold text-foreground">Sections analytiques modulables</h2>
 
-        <div className="glass-card p-5">
-          <h3 className="mb-3 font-medium">1. Courbe de puissance</h3>
-          <div ref={chartRefs.powerCurve} className="rounded border border-border bg-background p-2">
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={analysis.powerCurveData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="speed" label={{ value: "Vent [m/s]", position: "insideBottom", offset: -5, ...axisLabelProps }} />
-                <YAxis label={{ value: "MW", angle: -90, position: "insideLeft", ...axisLabelProps }} />
-                <RechartsTooltip />
-                <Legend />
-                <Line dataKey="q90" stroke="hsl(var(--chart-1))" strokeDasharray="6 4" dot={false} name="Q90" />
-                <Line dataKey="q10" stroke="hsl(var(--chart-1))" strokeDasharray="6 4" dot={false} name="Q10" />
-                <Line dataKey="power" stroke="hsl(var(--chart-1))" strokeWidth={2.6} dot={false} name="Médiane" />
-              </LineChart>
-            </ResponsiveContainer>
+        {chartSpecs.map((spec, index) => (
+          <div key={spec.id} className="glass-card p-5">
+            <h3 className="mb-1 font-medium">{index + 1}. {spec.title}</h3>
+            <p className="mb-3 text-sm text-muted-foreground">{spec.caption}</p>
+            <div className="rounded border border-border bg-background p-2">
+              <img
+                src={spec.src}
+                alt={spec.title}
+                loading="lazy"
+                className="h-auto max-h-[420px] w-full rounded object-contain"
+              />
+            </div>
+            <textarea
+              value={interpretations[spec.id]}
+              onChange={(e) => setInterpretations((prev) => ({ ...prev, [spec.id]: e.target.value }))}
+              rows={4}
+              placeholder="Interprétation analyste"
+              className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
+            />
           </div>
-          <textarea
-            value={interpretations.powerCurve}
-            onChange={(e) => setInterpretations((prev) => ({ ...prev, powerCurve: e.target.value }))}
-            rows={4}
-            placeholder="Interprétation analyste"
-            className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </div>
-
-        <div className="glass-card p-5">
-          <h3 className="mb-3 font-medium">2. Distribution du vent et Weibull</h3>
-          <div ref={chartRefs.windDistribution} className="rounded border border-border bg-background p-2">
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={analysis.windDistributionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="range" />
-                <YAxis />
-                <RechartsTooltip />
-                <Legend />
-                <Bar dataKey="pct" fill="hsl(var(--chart-2))" name="Fréquence observée [%]" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          <textarea
-            value={interpretations.windDistribution}
-            onChange={(e) => setInterpretations((prev) => ({ ...prev, windDistribution: e.target.value }))}
-            rows={4}
-            placeholder="Interprétation analyste"
-            className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </div>
-
-        <div className="glass-card p-5">
-          <h3 className="mb-3 font-medium">3. Rose des vents</h3>
-          <div ref={chartRefs.windRose} className="rounded border border-border bg-background p-2">
-            <ResponsiveContainer width="100%" height={280}>
-              <RadarChart data={analysis.windRoseData} cx="50%" cy="50%" outerRadius="75%">
-                <PolarGrid />
-                <PolarAngleAxis dataKey="dir" />
-                <PolarRadiusAxis />
-                <Radar name="Fréquence" dataKey="freq" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.25} />
-                <Radar name="Puissance moyenne (kW)" dataKey="avgPower" stroke="hsl(var(--chart-5))" fill="hsl(var(--chart-5))" fillOpacity={0.2} />
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-          <textarea
-            value={interpretations.windRose}
-            onChange={(e) => setInterpretations((prev) => ({ ...prev, windRose: e.target.value }))}
-            rows={4}
-            placeholder="Interprétation analyste"
-            className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </div>
-
-        <div className="glass-card p-5">
-          <h3 className="mb-3 font-medium">4. Température et densité de puissance</h3>
-          <div ref={chartRefs.tempPower} className="rounded border border-border bg-background p-2">
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={analysis.tempPowerData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="temp" />
-                <YAxis />
-                <RechartsTooltip />
-                <Legend />
-                <Line dataKey="power" stroke="hsl(var(--chart-4))" strokeWidth={2.4} dot />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <textarea
-            value={interpretations.tempPower}
-            onChange={(e) => setInterpretations((prev) => ({ ...prev, tempPower: e.target.value }))}
-            rows={4}
-            placeholder="Interprétation analyste"
-            className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </div>
-
-        <div className="glass-card p-5">
-          <h3 className="mb-3 font-medium">5. Distribution densité de l'air</h3>
-          <div ref={chartRefs.airDensity} className="rounded border border-border bg-background p-2">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={analysis.airDensityData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="density" />
-                <YAxis />
-                <RechartsTooltip />
-                <Legend />
-                <Bar dataKey="count" fill="hsl(var(--chart-1))" name="Nombre de mesures" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <textarea
-            value={interpretations.airDensity}
-            onChange={(e) => setInterpretations((prev) => ({ ...prev, airDensity: e.target.value }))}
-            rows={4}
-            placeholder="Interprétation analyste"
-            className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2"
-          />
-        </div>
+        ))}
       </section>
 
       <section className="glass-card grid gap-4 p-5">

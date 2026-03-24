@@ -161,7 +161,29 @@ const AnalyseEolienne = () => {
     weibullDistribution: `${imageBase}/distribution_weibull.png?t=${imageStamp}`,
     windRoseFrequency: `${imageBase}/rose_vents_frequence.png?t=${imageStamp}`,
     windRosePower: `${imageBase}/rose_vents_puissance.png?t=${imageStamp}`,
+    directionPowerScatter: `${imageBase}/direction_puissance_brut.png?t=${imageStamp}`,
   };
+  const sortedPowerCurve = [...currentData.powerCurveData].sort((a, b) => a.speed - b.speed);
+  const maxPowerPoint = sortedPowerCurve.reduce(
+    (best, point) => (point.power > best.power ? point : best),
+    sortedPowerCurve[0] ?? { speed: 0, power: 0, q10: 0, q90: 0 },
+  );
+  const cutOutPoint = sortedPowerCurve.find(
+    (point) => point.speed > currentData.kpis.ratedSpeed && point.power <= 0.01,
+  );
+  const performanceHighlights = [
+    { label: "Vitesse de démarrage", value: `${currentData.kpis.cutInSpeed} m/s` },
+    { label: "Puissance maximale observée", value: `${maxPowerPoint.power.toFixed(2)} MW` },
+    { label: "Vitesse de plateau nominal", value: `${currentData.kpis.ratedSpeed} m/s` },
+    {
+      label: "Vitesse de retour à puissance nulle",
+      value: cutOutPoint ? `${cutOutPoint.speed.toFixed(1)} m/s` : "Non observée",
+    },
+    {
+      label: "Rendement (facteur de capacité)",
+      value: `${(currentData.kpis.capacityFactor * 100).toFixed(1)}%`,
+    },
+  ];
 
   if (!loaded) {
     return (
@@ -213,7 +235,7 @@ const AnalyseEolienne = () => {
       </div>
       {loading && (
         <div className="glass-card p-3 text-sm text-muted-foreground">
-          Calcul des analyses en cours via FastAPI...
+          Analyse en cours...
         </div>
       )}
       {error && (
@@ -274,23 +296,39 @@ const AnalyseEolienne = () => {
       </div>
 
       {activeTab === "performance" && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6">
           <ChartCard
-            title="Puissance vs vitesse (données brutes)"
-            purpose="Visualisation directe des points de mesure pour conserver le niveau de détail du calcul Python."
+            title="Indicateurs clés de performance"
+            purpose="Repères opérationnels utiles avant la lecture des graphiques de puissance."
           >
-            <ImageChart src={imageSrc.powerCurveScatter} alt="Nuage brut puissance en fonction de la vitesse du vent" />
-          </ChartCard>
-
-          <ChartCard
-            title="Ajustement sur eta"
-            purpose="Courbe de puissance ajustée (haut) et résidus du modèle (bas)."
-          >
-            <div className="grid gap-4">
-              <ImageChart src={imageSrc.powerCurveEtaTop} alt="Courbe de puissance avec regression sur eta" />
-              <ImageChart src={imageSrc.powerCurveEtaResiduals} alt="Residus de l'ajustement sur eta" />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {performanceHighlights.map((item) => (
+                <div key={item.label} className="rounded-lg border border-border bg-background/70 p-3">
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
+                  <p className="mt-1 font-display text-base font-semibold text-foreground">{item.value}</p>
+                </div>
+              ))}
             </div>
           </ChartCard>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ChartCard
+              title="Puissance vs vitesse (données brutes)"
+              purpose="Visualisation directe des points de mesure pour conserver le niveau de détail du calcul Python."
+            >
+              <ImageChart src={imageSrc.powerCurveScatter} alt="Nuage brut puissance en fonction de la vitesse du vent" />
+            </ChartCard>
+
+            <ChartCard
+              title="Ajustement sur eta"
+              purpose="Courbe de puissance ajustée (haut) et résidus du modèle (bas)."
+            >
+              <div className="grid gap-4">
+                <ImageChart src={imageSrc.powerCurveEtaTop} alt="Courbe de puissance avec regression sur eta" />
+                <ImageChart src={imageSrc.powerCurveEtaResiduals} alt="Residus de l'ajustement sur eta" />
+              </div>
+            </ChartCard>
+          </div>
         </div>
       )}
 
@@ -328,10 +366,10 @@ const AnalyseEolienne = () => {
       {activeTab === "direction" && (
         <div className="grid gap-6 lg:grid-cols-2">
           <ChartCard
-            title="Rose des vents (fréquence)"
-            purpose="Répartition directionnelle de la ressource en vent."
+            title="Pelec[w] en fonction de Dir_Vent_[deg]"
+            purpose="Montre l'éparpillement de la puissance selon la direction du vent."
           >
-            <ImageChart src={imageSrc.windRoseFrequency} alt="Rose des vents en fréquence" />
+            <ImageChart src={imageSrc.directionPowerScatter} alt="Nuage de points puissance selon direction du vent" />
           </ChartCard>
 
           <ChartCard
