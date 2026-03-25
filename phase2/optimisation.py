@@ -12,8 +12,59 @@ from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 TRANSPORT_CONSTRAINTS_PATH = ROOT_DIR / "phase2" / "data" / "transport_constraints.json"
-NEODYMIUM_PRICE_INCREASE_TURBINE_IDS = {1, 4, 7, 10, 12, 14, 18, 20, 21}
-NEODYMIUM_PRICE_MULTIPLIER = 1.10
+ACOUSTIC_CONSTRAINTS_PATH = ROOT_DIR / "phase2" / "data" / "acoustic_constraints.json"
+UPDATED_TURBINE_PRICE_EUR = {
+    1: 31_240_000,
+    2: 23_200_000,
+    3: 15_100_000,
+    4: 16_500_000,
+    5: 13_300_000,
+    6: 14_900_000,
+    7: 15_950_000,
+    8: 8_700_000,
+    9: 7_200_000,
+    10: 13_640_000,
+    11: 6_300_000,
+    12: 10_230_000,
+    13: 7_800_000,
+    14: 4_950_000,
+    15: 6_100_000,
+    16: 6_000_000,
+    17: 4_100_000,
+    18: 3_520_000,
+    19: 2_300_000,
+    20: 2_090_000,
+    21: 2_970_000,
+    22: 1_300_000,
+    23: 700_000,
+    24: 1_000_000,
+}
+ACOUSTIC_MAST_HEIGHT_BY_TURBINE_ID_M = {
+    1: 170.0,
+    2: 170.0,
+    3: 130.0,
+    4: 130.0,
+    5: 130.0,
+    6: 110.0,
+    7: 110.0,
+    8: 100.0,
+    9: 100.0,
+    10: 90.0,
+    11: 90.0,
+    12: 90.0,
+    13: 90.0,
+    14: 70.0,
+    15: 70.0,
+    16: 70.0,
+    17: 50.0,
+    18: 50.0,
+    19: 40.0,
+    20: 40.0,
+    21: 40.0,
+    22: 30.0,
+    23: 30.0,
+    24: 30.0,
+}
 BASE_ALLOWED_PARCELS = [
     "3H",
     "3J",
@@ -102,6 +153,10 @@ class Config:
     transport_steering_angle_deg: float = 40.0
     truck_base_mass_t: float = 38.0
     truck_blade_mass_factor_t_per_m: float = 0.9
+    acoustic_lp_limit_dba: float = 40.0
+    acoustic_receiver_height_m: float = 2.0
+    acoustic_ground_reflection_q: float = 1.0
+    acoustic_wind_delta_lw_dba: float = 0.28
 
 
 @dataclass
@@ -109,6 +164,11 @@ class ParcelTransportConstraint:
     distance_to_access_road_m: float
     min_curve_radius_m: float
     bridge_limit_t: float | None
+
+
+@dataclass
+class ParcelAcousticConstraint:
+    closest_habitation_to_field_m: float
 
 
 def parse_args() -> argparse.Namespace:
@@ -147,10 +207,9 @@ def diameter_class_strict(d_m: float) -> int:
 def read_turbines(path: Path) -> list[dict[str, Any]]:
     turbines = json.loads(path.read_text(encoding="utf-8"))
     for t in turbines:
-        base_price = int(t["price_eur"])
-        t["base_price_eur"] = base_price
-        if int(t["id"]) in NEODYMIUM_PRICE_INCREASE_TURBINE_IDS:
-            t["price_eur"] = int(round(base_price * NEODYMIUM_PRICE_MULTIPLIER))
+        tid = int(t["id"])
+        t["price_eur"] = int(UPDATED_TURBINE_PRICE_EUR.get(tid, int(t["price_eur"])))
+        t["mast_height_m"] = float(ACOUSTIC_MAST_HEIGHT_BY_TURBINE_ID_M[tid])
         t["diameter_class"] = diameter_class_strict(float(t["D_m"]))
     return turbines
 
@@ -186,6 +245,34 @@ def load_transport_constraints(
         ),
     }
     return constraints, globals_cfg
+
+
+def load_acoustic_constraints(path: Path) -> dict[str, ParcelAcousticConstraint]:
+    if not path.exists():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    parcels_raw = raw.get("parcels", {})
+    out: dict[str, ParcelAcousticConstraint] = {}
+    for parcel, item in parcels_raw.items():
+        out[parcel] = ParcelAcousticConstraint(
+            closest_habitation_to_field_m=float(item["closest_habitation_to_field_m"]),
+        )
+    return out
+
+
+def acoustic_power_level_lw_dba(turbine: dict[str, Any], wind_delta_lw_dba: float) -> float:
+    # LW [dBA] = 11*log10(Pn[MW]) + 101.1, corrigé au cas vent défavorable.
+    p_nom_mw = max(float(turbine["rated_power_mw"]), 1e-6)
+    return 11.0 * math.log10(p_nom_mw) + 101.1 + wind_delta_lw_dba
+
+
+def acoustic_pressure_level_lpa_dba(
+    lw_dba: float, d_m: float, h_source_m: float, h_receiver_m: float, q_reflection: float
+) -> float:
+    r1 = math.sqrt(d_m ** 2 + (h_source_m - h_receiver_m) ** 2)
+    r2 = math.sqrt(d_m ** 2 + (h_source_m + h_receiver_m) ** 2)
+    term = (1.0 / (r1 ** 2)) + ((q_reflection ** 2) / (r2 ** 2))
+    return lw_dba + 10.0 * math.log10(max(term, 1e-30)) - 11.0
 
 
 def parse_wind_text(raw_text: str) -> list[tuple[float, float]]:
@@ -350,6 +437,7 @@ def build_options_for_parcel(
     turbines: list[dict[str, Any]],
     cfg: Config,
     transport_constraints: dict[str, ParcelTransportConstraint],
+    acoustic_constraints: dict[str, ParcelAcousticConstraint],
 ) -> list[dict[str, Any]]:
     options: list[dict[str, Any]] = []
     thetas = list(range(0, 360, cfg.theta_step_deg))
@@ -362,6 +450,8 @@ def build_options_for_parcel(
 
         transport_ok = True
         transport_reason = None
+        acoustic_ok = True
+        acoustic_reason = None
         if not is_offshore_parcel:
             c = transport_constraints.get(parcel)
             if c is None:
@@ -381,7 +471,27 @@ def build_options_for_parcel(
                 elif c.bridge_limit_t is not None and c.bridge_limit_t < estimated_truck_mass_t:
                     transport_ok = False
                     transport_reason = "bridge_weight_limit"
+            ac = acoustic_constraints.get(parcel)
+            if ac is None:
+                acoustic_ok = False
+                acoustic_reason = "missing_acoustic_data"
+            else:
+                d_ground = max(float(ac.closest_habitation_to_field_m), 1.0)
+                h_source = float(t["mast_height_m"]) + (float(t["D_m"]) / 2.0)
+                lw = acoustic_power_level_lw_dba(t, cfg.acoustic_wind_delta_lw_dba)
+                lpa = acoustic_pressure_level_lpa_dba(
+                    lw_dba=lw,
+                    d_m=d_ground,
+                    h_source_m=h_source,
+                    h_receiver_m=cfg.acoustic_receiver_height_m,
+                    q_reflection=cfg.acoustic_ground_reflection_q,
+                )
+                if lpa > cfg.acoustic_lp_limit_dba:
+                    acoustic_ok = False
+                    acoustic_reason = "acoustic_limit_exceeded"
         if not transport_ok:
+            continue
+        if not acoustic_ok:
             continue
 
         cap_max = CAPACITY_BY_PARCEL[parcel][t["diameter_class"]]
@@ -425,6 +535,8 @@ def build_options_for_parcel(
                         "feasible": True,
                         "transport_ok": transport_ok,
                         "transport_blocker": transport_reason,
+                        "acoustic_ok": acoustic_ok,
+                        "acoustic_blocker": acoustic_reason,
                     }
                 )
     options.sort(key=lambda x: (x["profit_net_eur_per_year"], -x["cost_total_eur"]), reverse=True)
@@ -503,6 +615,7 @@ def main() -> None:
     cfg = Config(theta_step_deg=args.theta_step)
     allowed_parcels = allowed_parcels_for_constraint_set(args.constraint_set)
     transport_constraints, transport_globals = load_transport_constraints(TRANSPORT_CONSTRAINTS_PATH)
+    acoustic_constraints = load_acoustic_constraints(ACOUSTIC_CONSTRAINTS_PATH)
     cfg.transport_steering_angle_deg = float(
         transport_globals.get("steering_max_angle_deg", cfg.transport_steering_angle_deg)
     )
@@ -526,6 +639,7 @@ def main() -> None:
             turbines=turbines,
             cfg=cfg,
             transport_constraints=transport_constraints,
+            acoustic_constraints=acoustic_constraints,
         )
         for parcel in allowed_parcels
     }
@@ -553,8 +667,12 @@ def main() -> None:
             "transport_steering_angle_deg": cfg.transport_steering_angle_deg,
             "truck_base_mass_t": cfg.truck_base_mass_t,
             "truck_blade_mass_factor_t_per_m": cfg.truck_blade_mass_factor_t_per_m,
-            "neodymium_price_multiplier": NEODYMIUM_PRICE_MULTIPLIER,
-            "neodymium_price_impacted_turbine_ids": sorted(NEODYMIUM_PRICE_INCREASE_TURBINE_IDS),
+            "acoustic_constraints_file": str(ACOUSTIC_CONSTRAINTS_PATH),
+            "acoustic_lp_limit_dba": cfg.acoustic_lp_limit_dba,
+            "acoustic_receiver_height_m": cfg.acoustic_receiver_height_m,
+            "acoustic_ground_reflection_q": cfg.acoustic_ground_reflection_q,
+            "acoustic_wind_delta_lw_dba": cfg.acoustic_wind_delta_lw_dba,
+            "updated_turbine_prices_source": "mission_update_image",
             "notes": [
                 "Capacites parcelles depuis Mission2_pres.pdf (diapo capacite).",
                 "Donnees meteo chargees uniquement depuis phase2/data/Data brut/*.zip.",
@@ -562,7 +680,9 @@ def main() -> None:
                 "Contrainte terrestre/offshore appliquee selon parcelles marines (zones bleues).",
                 "constraint-set=2: parcelles avifaune exclues (Milvus migrans / Falco naumanni).",
                 "Contrainte transport terrestre appliquee: distance <= 500m, rayon de braquage, limite de pont.",
-                "Hausse de +10% appliquee aux turbines a aimants permanents: 1,4,7,10,12,14,18,20,21.",
+                "Contrainte acoustique appliquee a Lp<=40 dBA (sol rigide, vent defavorable, source au centre du rotor).",
+                "Hauteurs de mat appliquees selon tableau mission (eoliennes 1..24).",
+                "Prix eoliennes mis a jour selon la derniere grille fournie.",
                 "Capacite appliquee strictement selon le tableau D=200..30 (sans approximation de diametre).",
                 "Direction penalisee via max(0, cos(delta))^p.",
                 "Pertes de sillage calibrees pour coller au modele du site: wake_loss_alpha.",

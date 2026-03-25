@@ -57,8 +57,10 @@ type OptimisationPayload = {
     transport_steering_angle_deg?: number;
     truck_base_mass_t?: number;
     truck_blade_mass_factor_t_per_m?: number;
-    neodymium_price_multiplier?: number;
-    neodymium_price_impacted_turbine_ids?: number[];
+    acoustic_lp_limit_dba?: number;
+    acoustic_receiver_height_m?: number;
+    acoustic_ground_reflection_q?: number;
+    acoustic_wind_delta_lw_dba?: number;
     notes?: string[];
   };
 };
@@ -155,8 +157,12 @@ const Optimisation = () => {
                 {(data.meta?.truck_blade_mass_factor_t_per_m ?? 0.9).toFixed(1)} t/m de pale).
               </li>
               <li>
-                Néodyme: +{Math.round(((data.meta?.neodymium_price_multiplier ?? 1.1) - 1) * 100)}% sur les turbines à
-                aimants permanents ({(data.meta?.neodymium_price_impacted_turbine_ids ?? [1, 4, 7, 10, 12, 14, 18, 20, 21]).join(", ")}).
+                Acoustique: Lp ≤ {data.meta?.acoustic_lp_limit_dba ?? 40} dBA (sol rigide Q=
+                {data.meta?.acoustic_ground_reflection_q ?? 1}, récepteur {data.meta?.acoustic_receiver_height_m ?? 2} m, vent défavorable ΔLW=
+                {data.meta?.acoustic_wind_delta_lw_dba ?? 0.28} dBA).
+              </li>
+              <li>
+                Prix turbines: grille mission mise à jour appliquée (incluant les hausses liées aux aimants permanents).
               </li>
             </ul>
             {data.meta?.notes?.length ? (

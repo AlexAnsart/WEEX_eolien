@@ -1,0 +1,148 @@
+{
+  "measurement_protocol": {
+    "version": 1,
+    "description": "Mesures manuelles des distances minimales habitation-limite du champ sur les cartes acoustiques.",
+    "generated_at_utc": "2026-03-25T15:31:16.809660+00:00",
+    "input_file": "C:\\Users\\loupa\\Documents\\GitHub\\WEEX_eolien\\phase2\\data\\acoustic_measurements.json",
+    "scale_reference_m": 2000.0
+  },
+  "parcels": {
+    "11E": {
+      "closest_habitation_to_field_m": 269.2
+    },
+    "12E": {
+      "closest_habitation_to_field_m": 384.6
+    },
+    "13F": {
+      "closest_habitation_to_field_m": 169.8
+    },
+    "16E": {
+      "closest_habitation_to_field_m": 339.6
+    },
+    "18F": {
+      "closest_habitation_to_field_m": 2307.7
+    },
+    "18G": {
+      "closest_habitation_to_field_m": 2307.7
+    },
+    "18H": {
+      "closest_habitation_to_field_m": 2307.7
+    },
+    "3H": {
+      "closest_habitation_to_field_m": 192.3
+    },
+    "3J": {
+      "closest_habitation_to_field_m": 134.6
+    },
+    "4E": {
+      "closest_habitation_to_field_m": 538.5
+    },
+    "4H": {
+      "closest_habitation_to_field_m": 865.4
+    },
+    "5G": {
+      "closest_habitation_to_field_m": 264.2
+    },
+    "6G": {
+      "closest_habitation_to_field_m": 415.1
+    },
+    "9E": {
+      "closest_habitation_to_field_m": 384.6
+    },
+    "9F": {
+      "closest_habitation_to_field_m": 346.2
+    }
+  },
+  "traceability_by_parcel": {
+    "11E": {
+      "source_map": "MAP_11E_12E.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 14.0
+    },
+    "12E": {
+      "source_map": "MAP_11E_12E.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 20.0
+    },
+    "13F": {
+      "source_map": "MAP_13F.png",
+      "scale_bar_px": 106.0,
+      "meter_per_pixel": 18.9,
+      "closest_habitation_to_field_px": 9.0
+    },
+    "16E": {
+      "source_map": "MAP_16E.png",
+      "scale_bar_px": 106.0,
+      "meter_per_pixel": 18.9,
+      "closest_habitation_to_field_px": 18.0
+    },
+    "18F": {
+      "source_map": "MAP_18F_18G_18H.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 120.0
+    },
+    "18G": {
+      "source_map": "MAP_18F_18G_18H.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 120.0
+    },
+    "18H": {
+      "source_map": "MAP_18F_18G_18H.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 120.0
+    },
+    "3H": {
+      "source_map": "MAP_3H_4H.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 10.0
+    },
+    "3J": {
+      "source_map": "MAP_3J.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 7.0
+    },
+    "4E": {
+      "source_map": "MAP_4E.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 28.0
+    },
+    "4H": {
+      "source_map": "MAP_3H_4H.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 45.0
+    },
+    "5G": {
+      "source_map": "MAP_5G_6G.png",
+      "scale_bar_px": 106.0,
+      "meter_per_pixel": 18.9,
+      "closest_habitation_to_field_px": 14.0
+    },
+    "6G": {
+      "source_map": "MAP_5G_6G.png",
+      "scale_bar_px": 106.0,
+      "meter_per_pixel": 18.9,
+      "closest_habitation_to_field_px": 22.0
+    },
+    "9E": {
+      "source_map": "MAP_9E_9F.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 20.0
+    },
+    "9F": {
+      "source_map": "MAP_9E_9F.png",
+      "scale_bar_px": 104.0,
+      "meter_per_pixel": 19.2,
+      "closest_habitation_to_field_px": 18.0
+    }
+  }
+}

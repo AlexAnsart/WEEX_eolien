@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "description": "Mesures manuelles des distances minimales habitation-limite du champ sur les cartes acoustiques.",
+  "global": {
+    "scale_bar_real_m": 2000.0
+  },
+  "maps": {
+    "MAP_3H_4H.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "3H": { "closest_habitation_to_field_px": 10.0 },
+        "4H": { "closest_habitation_to_field_px": 45.0 }
+      }
+    },
+    "MAP_3J.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "3J": { "closest_habitation_to_field_px": 7.0 }
+      }
+    },
+    "MAP_4E.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "4E": { "closest_habitation_to_field_px": 28.0 }
+      }
+    },
+    "MAP_5G_6G.png": {
+      "scale_bar_px": 106.0,
+      "parcels": {
+        "5G": { "closest_habitation_to_field_px": 14.0 },
+        "6G": { "closest_habitation_to_field_px": 22.0 }
+      }
+    },
+    "MAP_9E_9F.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "9E": { "closest_habitation_to_field_px": 20.0 },
+        "9F": { "closest_habitation_to_field_px": 18.0 }
+      }
+    },
+    "MAP_11E_12E.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "11E": { "closest_habitation_to_field_px": 14.0 },
+        "12E": { "closest_habitation_to_field_px": 20.0 }
+      }
+    },
+    "MAP_13F.png": {
+      "scale_bar_px": 106.0,
+      "parcels": {
+        "13F": { "closest_habitation_to_field_px": 9.0 }
+      }
+    },
+    "MAP_16E.png": {
+      "scale_bar_px": 106.0,
+      "parcels": {
+        "16E": { "closest_habitation_to_field_px": 18.0 }
+      }
+    },
+    "MAP_18F_18G_18H.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "18F": { "closest_habitation_to_field_px": 120.0 },
+        "18G": { "closest_habitation_to_field_px": 120.0 },
+        "18H": { "closest_habitation_to_field_px": 120.0 }
+      }
+    }
+  }
+}

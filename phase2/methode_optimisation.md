@@ -77,6 +77,40 @@ Pour rendre la contrainte traçable, les valeurs ne sont plus codées "à la mai
 
 Cette étape permet de justifier chaque valeur de contrainte par la carte d'origine et de recalculer facilement si les mesures sont affinées.
 
+## 3.5 Contrainte acoustique terrestre (cumulative)
+
+Une contrainte acoustique est appliquée à chaque couple `(parcelle terrestre, type d'éolienne)`.
+
+Principe :
+
+- On considère le cas défavorable demandé :
+  - sol rigide (`Q = 1`),
+  - correction vent défavorable `ΔLW = +0.28 dBA`,
+  - limite réglementaire `Lp,max = 40 dBA`.
+- La source acoustique est placée au centre du rotor :
+  - `h_source = h_mat + D/2`.
+- Le récepteur est pris à `hO = 2 m`.
+- La distance au sol `d` utilisée est la distance minimale entre une habitation et la limite du champ (cas "éolienne placée au plus proche des habitations").
+
+Le niveau de puissance acoustique est estimé à partir du rapport d'essais :
+
+- `LW = 11*log10(Pn[MW]) + 101.1 + ΔLW`.
+
+Puis le niveau de pression au récepteur est calculé avec le modèle du document `Modele_acoustique.pdf` :
+
+- `Lp = LW + 10*log10(1/R1^2 + |Q|^2/R2^2) - 11`
+- `R1 = sqrt(d^2 + (hS-hO)^2)` et `R2 = sqrt(d^2 + (hS+hO)^2)`.
+
+Si `Lp > 40 dBA`, le type d'éolienne est interdit pour la parcelle.
+
+### 3.5.1 Traçabilité cartographique acoustique
+
+- Mesures brutes : `phase2/data/acoustic_measurements.json`.
+- Conversion : `phase2/build_acoustic_constraints.py`.
+- Fichier exploité par l'optimisation : `phase2/data/acoustic_constraints.json`.
+
+Le JSON généré contient aussi une section de traçabilité par parcelle (carte source, échelle, mesure en pixels).
+
 ---
 
 ## 4. Comment la météo sur 20 ans est utilisée

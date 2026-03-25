@@ -14,6 +14,7 @@ from optimisation import (
     build_parcel_distribution_20y,
     build_wind_aggregated,
     compute_summary,
+    load_acoustic_constraints,
     load_transport_constraints,
     load_wind_observations,
     read_turbines,
@@ -114,6 +115,7 @@ def main() -> None:
     cfg = Config(theta_step_deg=args.theta_step)
     allowed_parcels = allowed_parcels_for_constraint_set(args.constraint_set)
     transport_constraints, transport_globals = load_transport_constraints(TRANSPORT_CONSTRAINTS_PATH)
+    acoustic_constraints = load_acoustic_constraints(ROOT_DIR / "phase2" / "data" / "acoustic_constraints.json")
     cfg.transport_steering_angle_deg = float(
         transport_globals.get("steering_max_angle_deg", cfg.transport_steering_angle_deg)
     )
@@ -137,6 +139,7 @@ def main() -> None:
             turbines=turbines,
             cfg=cfg,
             transport_constraints=transport_constraints,
+            acoustic_constraints=acoustic_constraints,
         )
         for parcel in allowed_parcels
     }
