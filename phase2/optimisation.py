@@ -95,13 +95,15 @@ BASE_ALLOWED_PARCELS = [
 # sous la forme "3H", "4E", etc. Lors de la saisie utilisateur, "E4" est donc
 # interprete comme "4E", etc.
 BIRD_PROTECTION_EXCLUDED_PARCELS = {"4E", "3J", "16E", "18F", "18G", "18H"}
+HERITAGE_COVISIBILITY_EXCLUDED_PARCELS = {"13F"}
 
 
 def allowed_parcels_for_constraint_set(constraint_set: int) -> list[str]:
+    heritage_filtered = [p for p in BASE_ALLOWED_PARCELS if p not in HERITAGE_COVISIBILITY_EXCLUDED_PARCELS]
     if constraint_set == 1:
-        return list(BASE_ALLOWED_PARCELS)
+        return heritage_filtered
     if constraint_set == 2:
-        return [p for p in BASE_ALLOWED_PARCELS if p not in BIRD_PROTECTION_EXCLUDED_PARCELS]
+        return [p for p in heritage_filtered if p not in BIRD_PROTECTION_EXCLUDED_PARCELS]
     raise ValueError(
         f"constraint-set={constraint_set} non supporte. Valeurs autorisees: 1 (base), 2 (avec avifaune)."
     )
@@ -539,7 +541,7 @@ def build_options_for_parcel(
                         "acoustic_blocker": acoustic_reason,
                     }
                 )
-    options.sort(key=lambda x: (x["profit_net_eur_per_year"], -x["cost_total_eur"]), reverse=True)
+    options.sort(key=lambda x: (x["energy_mwh_per_year"], -x["cost_total_eur"]), reverse=True)
     return options[: cfg.max_options_per_parcel]
 
 
@@ -551,7 +553,15 @@ def optimize_global(
     budget_steps = cfg.budget_limit_eur // cfg.budget_quantization_eur
 
     all_options = {
-        p: [{"parcel_id": p, "cost_total_eur": 0, "profit_net_eur_per_year": 0.0, "none": True}]
+        p: [
+            {
+                "parcel_id": p,
+                "cost_total_eur": 0,
+                "profit_net_eur_per_year": 0.0,
+                "energy_mwh_per_year": 0.0,
+                "none": True,
+            }
+        ]
         + options_by_parcel[p]
         for p in parcels
     }
@@ -571,7 +581,7 @@ def optimize_global(
                 nb = b + c
                 if nb > budget_steps:
                     continue
-                v = dp[b] + float(opt["profit_net_eur_per_year"])
+                v = dp[b] + float(opt["energy_mwh_per_year"])
                 if v > nxt[nb]:
                     nxt[nb] = v
                     choice[i][nb] = opt_idx
@@ -648,7 +658,7 @@ def main() -> None:
     result = {
         "scenario": args.scenario,
         "constraint_set": args.constraint_set,
-        "objective_model_version": "phase2_v1_directional_roi_budget_dp",
+        "objective_model_version": "phase2_v2_energy_maximization_dp",
         "summary": compute_summary(placements, cfg),
         "placements": placements,
         "meta": {
@@ -656,6 +666,7 @@ def main() -> None:
             "excluded_parcels_avifaune": sorted(BIRD_PROTECTION_EXCLUDED_PARCELS)
             if args.constraint_set == 2
             else [],
+            "excluded_parcels_heritage_covisibility": sorted(HERITAGE_COVISIBILITY_EXCLUDED_PARCELS),
             "theta_step_deg": cfg.theta_step_deg,
             "buyback_price_eur_per_mwh": cfg.buyback_price_eur_per_mwh,
             "maintenance_cost_eur_per_mwh": cfg.maintenance_cost_eur_per_mwh,
@@ -681,12 +692,14 @@ def main() -> None:
                 "constraint-set=2: parcelles avifaune exclues (Milvus migrans / Falco naumanni).",
                 "Contrainte transport terrestre appliquee: distance <= 500m, rayon de braquage, limite de pont.",
                 "Contrainte acoustique appliquee a Lp<=40 dBA (sol rigide, vent defavorable, source au centre du rotor).",
+                "Contrainte patrimoine/covisibilite: parcelle 13F interdite a l'implantation.",
                 "Hauteurs de mat appliquees selon tableau mission (eoliennes 1..24).",
                 "Prix eoliennes mis a jour selon la derniere grille fournie.",
                 "Capacite appliquee strictement selon le tableau D=200..30 (sans approximation de diametre).",
                 "Direction penalisee via max(0, cos(delta))^p.",
                 "Pertes de sillage calibrees pour coller au modele du site: wake_loss_alpha.",
                 "Les options sont filtrees avec ROI <= 20 ans par parcelle.",
+                "Objectif global: maximisation de la production cumulee (MWh/an) sous contraintes.",
                 "Optimisation globale resolue par programmation dynamique (sans comparaison inter-methodes).",
             ],
         },
@@ -702,7 +715,7 @@ def main() -> None:
                 "output": str(args.output),
                 "wind_output": str(args.wind_output),
                 "placements": len(placements),
-                "total_profit_eur_per_year": result["summary"]["total_profit_eur_per_year"],
+                "total_energy_mwh_per_year": result["summary"]["total_energy_mwh_per_year"],
             }
         )
     )

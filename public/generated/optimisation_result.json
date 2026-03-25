@@ -1,7 +1,7 @@
 {
   "scenario": 1,
   "constraint_set": 2,
-  "objective_model_version": "phase2_v1_directional_roi_budget_dp",
+  "objective_model_version": "phase2_v2_energy_maximization_dp",
   "summary": {
     "total_cost_eur": 599700000,
     "budget_limit_eur": 600000000,
@@ -127,7 +127,6 @@
       "9F",
       "11E",
       "12E",
-      "13F",
       "14J",
       "15J"
     ],
@@ -138,6 +137,9 @@
       "18H",
       "3J",
       "4E"
+    ],
+    "excluded_parcels_heritage_covisibility": [
+      "13F"
     ],
     "theta_step_deg": 60,
     "buyback_price_eur_per_mwh": 80.0,
@@ -189,12 +191,14 @@
       "constraint-set=2: parcelles avifaune exclues (Milvus migrans / Falco naumanni).",
       "Contrainte transport terrestre appliquee: distance <= 500m, rayon de braquage, limite de pont.",
       "Contrainte acoustique appliquee a Lp<=40 dBA (sol rigide, vent defavorable, source au centre du rotor).",
+      "Contrainte patrimoine/covisibilite: parcelle 13F interdite a l'implantation.",
       "Hauteurs de mat appliquees selon tableau mission (eoliennes 1..24).",
       "Prix eoliennes mis a jour selon la derniere grille fournie.",
       "Capacite appliquee strictement selon le tableau D=200..30 (sans approximation de diametre).",
       "Direction penalisee via max(0, cos(delta))^p.",
       "Pertes de sillage calibrees pour coller au modele du site: wake_loss_alpha.",
       "Les options sont filtrees avec ROI <= 20 ans par parcelle.",
+      "Objectif global: maximisation de la production cumulee (MWh/an) sous contraintes.",
       "Optimisation globale resolue par programmation dynamique (sans comparaison inter-methodes)."
     ]
   }
