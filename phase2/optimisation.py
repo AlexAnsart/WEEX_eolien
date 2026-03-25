@@ -148,8 +148,8 @@ class Config:
     # (Le reste des parametres wake_loss_floor et wake_factor est conserve.)
     wake_loss_alpha: float = 0.0022944266238741117
     wake_loss_floor: float = 0.70
-    budget_quantization_eur: int = 100_000
-    max_options_per_parcel: int = 120
+    budget_quantization_eur: int = 50_000
+    max_options_per_parcel: int = 180
     yearly_aggregation_mode: str = "mean"
     transport_max_distance_m: float = 500.0
     transport_steering_angle_deg: float = 40.0
@@ -159,6 +159,7 @@ class Config:
     acoustic_receiver_height_m: float = 2.0
     acoustic_ground_reflection_q: float = 1.0
     acoustic_wind_delta_lw_dba: float = 0.28
+    offshore_priority_bonus_for_search: float = 0.03
 
 
 @dataclass
@@ -541,14 +542,28 @@ def build_options_for_parcel(
                         "acoustic_blocker": acoustic_reason,
                     }
                 )
+    # Tri principal: energie, puis cout.
     options.sort(key=lambda x: (x["energy_mwh_per_year"], -x["cost_total_eur"]), reverse=True)
-    return options[: cfg.max_options_per_parcel]
+
+    # Filtrage "Pareto simple" pour conserver des options non dominees
+    # (cout plus faible ET energie plus elevee) avant le tronquage final.
+    pareto: list[dict[str, Any]] = []
+    best_energy_at_or_below_cost = -1.0
+    for opt in sorted(options, key=lambda x: (x["cost_total_eur"], -x["energy_mwh_per_year"])):
+        e = float(opt["energy_mwh_per_year"])
+        if e > best_energy_at_or_below_cost:
+            pareto.append(opt)
+            best_energy_at_or_below_cost = e
+
+    pareto.sort(key=lambda x: (x["energy_mwh_per_year"], -x["cost_total_eur"]), reverse=True)
+    return pareto[: cfg.max_options_per_parcel]
 
 
 def optimize_global(
     options_by_parcel: dict[str, list[dict[str, Any]]],
     cfg: Config,
     parcels: list[str],
+    offshore_priority_bonus_for_search: float = 0.0,
 ) -> list[dict[str, Any]]:
     budget_steps = cfg.budget_limit_eur // cfg.budget_quantization_eur
 
@@ -581,7 +596,10 @@ def optimize_global(
                 nb = b + c
                 if nb > budget_steps:
                     continue
-                v = dp[b] + float(opt["energy_mwh_per_year"])
+                energy_score = float(opt["energy_mwh_per_year"])
+                if opt.get("install_kind") == "offshore":
+                    energy_score *= 1.0 + offshore_priority_bonus_for_search
+                v = dp[b] + energy_score
                 if v > nxt[nb]:
                     nxt[nb] = v
                     choice[i][nb] = opt_idx
@@ -653,7 +671,28 @@ def main() -> None:
         )
         for parcel in allowed_parcels
     }
-    placements = optimize_global(options_by_parcel, cfg, parcels=allowed_parcels)
+    placements_base = optimize_global(
+        options_by_parcel,
+        cfg,
+        parcels=allowed_parcels,
+        offshore_priority_bonus_for_search=0.0,
+    )
+    placements_offshore = optimize_global(
+        options_by_parcel,
+        cfg,
+        parcels=allowed_parcels,
+        offshore_priority_bonus_for_search=cfg.offshore_priority_bonus_for_search,
+    )
+    summary_base = compute_summary(placements_base, cfg)
+    summary_offshore = compute_summary(placements_offshore, cfg)
+
+    # Garde la meilleure strategie en production MWh/an.
+    if float(summary_offshore["total_energy_mwh_per_year"]) > float(summary_base["total_energy_mwh_per_year"]):
+        placements = placements_offshore
+        selected_strategy = "offshore_priority"
+    else:
+        placements = placements_base
+        selected_strategy = "base"
 
     result = {
         "scenario": args.scenario,
@@ -684,6 +723,12 @@ def main() -> None:
             "acoustic_ground_reflection_q": cfg.acoustic_ground_reflection_q,
             "acoustic_wind_delta_lw_dba": cfg.acoustic_wind_delta_lw_dba,
             "updated_turbine_prices_source": "mission_update_image",
+            "strategy_evaluation": {
+                "selected_strategy": selected_strategy,
+                "base_summary": summary_base,
+                "offshore_priority_summary": summary_offshore,
+                "offshore_priority_bonus_for_search": cfg.offshore_priority_bonus_for_search,
+            },
             "notes": [
                 "Capacites parcelles depuis Mission2_pres.pdf (diapo capacite).",
                 "Donnees meteo chargees uniquement depuis phase2/data/Data brut/*.zip.",
@@ -695,11 +740,13 @@ def main() -> None:
                 "Contrainte patrimoine/covisibilite: parcelle 13F interdite a l'implantation.",
                 "Hauteurs de mat appliquees selon tableau mission (eoliennes 1..24).",
                 "Prix eoliennes mis a jour selon la derniere grille fournie.",
+                "Prix de rachat conforme Mission2_pres.pdf: 80 EUR/MWh.",
                 "Capacite appliquee strictement selon le tableau D=200..30 (sans approximation de diametre).",
                 "Direction penalisee via max(0, cos(delta))^p.",
                 "Pertes de sillage calibrees pour coller au modele du site: wake_loss_alpha.",
                 "Les options sont filtrees avec ROI <= 20 ans par parcelle.",
                 "Objectif global: maximisation de la production cumulee (MWh/an) sous contraintes.",
+                "Strategie offshore testee automatiquement et retenue seulement si elle augmente les MWh.",
                 "Optimisation globale resolue par programmation dynamique (sans comparaison inter-methodes).",
             ],
         },

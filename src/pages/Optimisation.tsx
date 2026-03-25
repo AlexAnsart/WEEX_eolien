@@ -43,6 +43,7 @@ type Placement = {
 };
 
 type OptimisationPayload = {
+  objective_model_version?: string;
   summary: {
     total_cost_eur: number;
     budget_limit_eur: number;
@@ -65,12 +66,44 @@ type OptimisationPayload = {
   };
 };
 
+type BruteforcePayload = {
+  objective_model_version?: string;
+  summary: {
+    total_cost_eur: number;
+    budget_limit_eur: number;
+    total_energy_mwh_per_year: number;
+    total_profit_eur_per_year: number;
+    roi_min_years: number | null;
+    roi_max_years: number | null;
+  };
+  placements: Placement[];
+};
+
+type Optimisation5Payload = {
+  objective_model_version?: string;
+  summary: {
+    total_cost_eur: number;
+    budget_limit_eur: number;
+    total_energy_mwh_per_year: number;
+    total_profit_eur_per_year: number;
+    roi_min_years: number | null;
+    roi_max_years: number | null;
+  };
+  placements: Placement[];
+  meta?: {
+    offshore_priority_factor?: number;
+    objective_priority?: string[];
+  };
+};
+
 const euroFmt = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
 const numFmt = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 
 const Optimisation = () => {
   const [data, setData] = useState<OptimisationPayload | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<string | null>(null);
+  const [bruteforceData, setBruteforceData] = useState<BruteforcePayload | null>(null);
+  const [optimisation5Data, setOptimisation5Data] = useState<Optimisation5Payload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +124,20 @@ const Optimisation = () => {
       if (!resultRes.ok) throw new Error("Impossible de charger optimisation_result.json");
       const payload = (await resultRes.json()) as OptimisationPayload;
       setData(payload);
+      const bruteforceRes = await fetch(`/generated/optimisation4_result.json?t=${ts}`, { cache: "no-store" });
+      if (bruteforceRes.ok) {
+        const bruteforcePayload = (await bruteforceRes.json()) as BruteforcePayload;
+        setBruteforceData(bruteforcePayload);
+      } else {
+        setBruteforceData(null);
+      }
+      const optimisation5Res = await fetch(`/generated/optimisation5_result.json?t=${ts}`, { cache: "no-store" });
+      if (optimisation5Res.ok) {
+        const optimisation5Payload = (await optimisation5Res.json()) as Optimisation5Payload;
+        setOptimisation5Data(optimisation5Payload);
+      } else {
+        setOptimisation5Data(null);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -197,6 +244,25 @@ const Optimisation = () => {
             </div>
           </div>
 
+          {bruteforceData && (
+            <div className="glass-card p-4">
+              <p className="mb-2 text-sm font-medium">Méthode force brute (optimisation4)</p>
+              <p className="text-sm text-muted-foreground">
+                Version: {bruteforceData.objective_model_version ?? "n/a"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Production: {numFmt.format(bruteforceData.summary.total_energy_mwh_per_year)} MWh/an
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Budget: {euroFmt.format(bruteforceData.summary.total_cost_eur)} /{" "}
+                {euroFmt.format(bruteforceData.summary.budget_limit_eur)} €
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Placements: {bruteforceData.placements.length}
+              </p>
+            </div>
+          )}
+
           <div className="grid gap-6 xl:grid-cols-[55%_45%]">
             <div className="glass-card p-4">
               <p className="mb-3 text-sm font-medium">Grille des parcelles</p>
@@ -300,6 +366,79 @@ const Optimisation = () => {
               </tbody>
             </table>
           </div>
+
+          {optimisation5Data && (
+            <>
+              <div className="glass-card p-4">
+                <p className="mb-2 text-sm font-medium">Optimisation 5 (dynamique, priorité offshore)</p>
+                <p className="text-sm text-muted-foreground">
+                  Facteur priorité offshore: {optimisation5Data.meta?.offshore_priority_factor ?? 2.0}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Version: {optimisation5Data.objective_model_version ?? "n/a"}
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="glass-card p-4">
+                  <p className="text-xs text-muted-foreground">Budget utilisé (opt5)</p>
+                  <p className="font-display text-lg font-semibold">
+                    {euroFmt.format(optimisation5Data.summary.total_cost_eur)} / {euroFmt.format(optimisation5Data.summary.budget_limit_eur)} €
+                  </p>
+                </div>
+                <div className="glass-card p-4">
+                  <p className="text-xs text-muted-foreground">Production totale (opt5)</p>
+                  <p className="font-display text-lg font-semibold">
+                    {numFmt.format(optimisation5Data.summary.total_energy_mwh_per_year)} MWh/an
+                  </p>
+                </div>
+                <div className="glass-card p-4">
+                  <p className="text-xs text-muted-foreground">Profit net total (opt5)</p>
+                  <p className="font-display text-lg font-semibold">
+                    {euroFmt.format(optimisation5Data.summary.total_profit_eur_per_year)} €/an
+                  </p>
+                </div>
+                <div className="glass-card p-4">
+                  <p className="text-xs text-muted-foreground">Placements (opt5)</p>
+                  <p className="font-display text-lg font-semibold">{optimisation5Data.placements.length}</p>
+                </div>
+              </div>
+
+              <div className="glass-card overflow-x-auto p-4">
+                <p className="mb-3 text-sm font-medium">Table de vérification (optimisation5)</p>
+                <table className="w-full min-w-[900px] text-sm">
+                  <thead className="text-left text-muted-foreground">
+                    <tr>
+                      <th className="py-2">Parcelle</th>
+                      <th className="py-2">Type</th>
+                      <th className="py-2">n</th>
+                      <th className="py-2">Theta</th>
+                      <th className="py-2">Capacité max</th>
+                      <th className="py-2">Coût (€)</th>
+                      <th className="py-2">Énergie (MWh/an)</th>
+                      <th className="py-2">ROI (ans)</th>
+                      <th className="py-2">Feasible</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {optimisation5Data.placements.map((p) => (
+                      <tr key={`${p.parcel_id}-${p.type_id}-${p.theta_deg}`} className="border-t border-border/60">
+                        <td className="py-2">{p.parcel_id}</td>
+                        <td className="py-2">{p.type_id}</td>
+                        <td className="py-2">{p.n_turbines}</td>
+                        <td className="py-2">{p.theta_deg}°</td>
+                        <td className="py-2">{p.capacity_max}</td>
+                        <td className="py-2">{euroFmt.format(p.cost_total_eur)}</td>
+                        <td className="py-2">{numFmt.format(p.energy_mwh_per_year)}</td>
+                        <td className="py-2">{p.roi_years.toFixed(2)}</td>
+                        <td className="py-2">{String(p.feasible)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

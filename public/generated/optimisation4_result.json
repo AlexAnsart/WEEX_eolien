@@ -1,7 +1,7 @@
 {
   "scenario": 1,
   "constraint_set": 2,
-  "objective_model_version": "phase2_v2_energy_maximization_dp",
+  "objective_model_version": "phase2_v4_bruteforce_branch_and_bound",
   "summary": {
     "total_cost_eur": 599700000,
     "budget_limit_eur": 600000000,
@@ -115,6 +115,7 @@
     }
   ],
   "meta": {
+    "method": "bruteforce_branch_and_bound",
     "allowed_parcels": [
       "3H",
       "4H",
@@ -130,22 +131,10 @@
       "14J",
       "15J"
     ],
-    "excluded_parcels_avifaune": [
-      "16E",
-      "18F",
-      "18G",
-      "18H",
-      "3J",
-      "4E"
-    ],
-    "excluded_parcels_heritage_covisibility": [
-      "13F"
-    ],
     "theta_step_deg": 60,
+    "max_options_per_parcel": 180,
     "buyback_price_eur_per_mwh": 80.0,
     "maintenance_cost_eur_per_mwh": 30.0,
-    "roi_limit_years": 20.0,
-    "budget_quantization_eur": 50000,
     "years_used": [
       "1995",
       "1996",
@@ -171,57 +160,6 @@
       "2016",
       "2017",
       "2018"
-    ],
-    "transport_constraints_file": "C:\\Users\\loupa\\Documents\\GitHub\\WEEX_eolien\\phase2\\data\\transport_constraints.json",
-    "transport_max_distance_m": 500.0,
-    "transport_steering_angle_deg": 40.0,
-    "truck_base_mass_t": 38.0,
-    "truck_blade_mass_factor_t_per_m": 0.9,
-    "acoustic_constraints_file": "C:\\Users\\loupa\\Documents\\GitHub\\WEEX_eolien\\phase2\\data\\acoustic_constraints.json",
-    "acoustic_lp_limit_dba": 40.0,
-    "acoustic_receiver_height_m": 2.0,
-    "acoustic_ground_reflection_q": 1.0,
-    "acoustic_wind_delta_lw_dba": 0.28,
-    "updated_turbine_prices_source": "mission_update_image",
-    "strategy_evaluation": {
-      "selected_strategy": "base",
-      "base_summary": {
-        "total_cost_eur": 599700000,
-        "budget_limit_eur": 600000000,
-        "total_energy_mwh_per_year": 1054324.9589748105,
-        "total_profit_eur_per_year": 52716247.948740534,
-        "roi_min_years": 9.276587162463384,
-        "roi_max_years": 16.236358133497635
-      },
-      "offshore_priority_summary": {
-        "total_cost_eur": 599700000,
-        "budget_limit_eur": 600000000,
-        "total_energy_mwh_per_year": 1054324.9589748105,
-        "total_profit_eur_per_year": 52716247.948740534,
-        "roi_min_years": 9.276587162463384,
-        "roi_max_years": 16.236358133497635
-      },
-      "offshore_priority_bonus_for_search": 0.03
-    },
-    "notes": [
-      "Capacites parcelles depuis Mission2_pres.pdf (diapo capacite).",
-      "Donnees meteo chargees uniquement depuis phase2/data/Data brut/*.zip.",
-      "Toutes les annees disponibles dans Data brut sont agregees en distribution vent (vitesse+direction) sur 20+ ans.",
-      "Contrainte terrestre/offshore appliquee selon parcelles marines (zones bleues).",
-      "constraint-set=2: parcelles avifaune exclues (Milvus migrans / Falco naumanni).",
-      "Contrainte transport terrestre appliquee: distance <= 500m, rayon de braquage, limite de pont.",
-      "Contrainte acoustique appliquee a Lp<=40 dBA (sol rigide, vent defavorable, source au centre du rotor).",
-      "Contrainte patrimoine/covisibilite: parcelle 13F interdite a l'implantation.",
-      "Hauteurs de mat appliquees selon tableau mission (eoliennes 1..24).",
-      "Prix eoliennes mis a jour selon la derniere grille fournie.",
-      "Prix de rachat conforme Mission2_pres.pdf: 80 EUR/MWh.",
-      "Capacite appliquee strictement selon le tableau D=200..30 (sans approximation de diametre).",
-      "Direction penalisee via max(0, cos(delta))^p.",
-      "Pertes de sillage calibrees pour coller au modele du site: wake_loss_alpha.",
-      "Les options sont filtrees avec ROI <= 20 ans par parcelle.",
-      "Objectif global: maximisation de la production cumulee (MWh/an) sous contraintes.",
-      "Strategie offshore testee automatiquement et retenue seulement si elle augmente les MWh.",
-      "Optimisation globale resolue par programmation dynamique (sans comparaison inter-methodes)."
     ]
   }
 }

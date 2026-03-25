@@ -97,7 +97,11 @@ def generate_eolien_report(payload: EolienReportPayload) -> Response:
 @app.post("/api/optimisation/run")
 def run_optimisation(scenario: int = 1, constraint_set: int = 1, theta_step: int = 30) -> dict[str, Any]:
     script_path = ROOT_DIR / "phase2" / "optimisation.py"
+    script_path_bruteforce = ROOT_DIR / "phase2" / "optimisation4.py"
+    script_path_type_20_23 = ROOT_DIR / "phase2" / "optimisation5.py"
     output_path = ROOT_DIR / "public" / "generated" / "optimisation_result.json"
+    output_path_bruteforce = ROOT_DIR / "public" / "generated" / "optimisation4_result.json"
+    output_path_type_20_23 = ROOT_DIR / "public" / "generated" / "optimisation5_result.json"
     wind_output_path = ROOT_DIR / "phase2" / "data" / "wind_aggregated.json"
     cmd = [
         sys.executable,
@@ -116,11 +120,47 @@ def run_optimisation(scenario: int = 1, constraint_set: int = 1, theta_step: int
 
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     payload = json.loads(result.stdout.strip() or "{}")
+    cmd_bruteforce = [
+        sys.executable,
+        str(script_path_bruteforce),
+        "--scenario",
+        str(scenario),
+        "--constraint-set",
+        str(constraint_set),
+        "--theta-step",
+        str(theta_step),
+        "--output",
+        str(output_path_bruteforce),
+        "--wind-output",
+        str(wind_output_path),
+    ]
+    result_bruteforce = subprocess.run(cmd_bruteforce, capture_output=True, text=True, check=True)
+    payload_bruteforce = json.loads(result_bruteforce.stdout.strip() or "{}")
+    cmd_type_20_23 = [
+        sys.executable,
+        str(script_path_type_20_23),
+        "--scenario",
+        str(scenario),
+        "--constraint-set",
+        str(constraint_set),
+        "--theta-step",
+        str(theta_step),
+        "--output",
+        str(output_path_type_20_23),
+        "--wind-output",
+        str(wind_output_path),
+    ]
+    result_type_20_23 = subprocess.run(cmd_type_20_23, capture_output=True, text=True, check=True)
+    payload_type_20_23 = json.loads(result_type_20_23.stdout.strip() or "{}")
     return {
         "sourceScript": "phase2/optimisation.py",
         "resultPath": "public/generated/optimisation_result.json",
+        "resultPathBruteforce": "public/generated/optimisation4_result.json",
+        "resultPathType20_23": "public/generated/optimisation5_result.json",
         "windPath": "phase2/data/wind_aggregated.json",
         "run": payload,
+        "runBruteforce": payload_bruteforce,
+        "runType20_23": payload_type_20_23,
     }
 
 
