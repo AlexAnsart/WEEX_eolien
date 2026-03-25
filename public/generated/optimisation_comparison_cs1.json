@@ -1,0 +1,40 @@
+{
+  "methods": [
+    {
+      "method": "dynamic_programming",
+      "result_file": "optimisation_result.json",
+      "summary": {
+        "total_cost_eur": 599700000,
+        "budget_limit_eur": 600000000,
+        "total_energy_mwh_per_year": 1138246.4972317247,
+        "total_profit_eur_per_year": 56912324.861586235,
+        "roi_min_years": 9.663925846136866,
+        "roi_max_years": 11.85406049665927
+      }
+    },
+    {
+      "method": "monte_carlo",
+      "result_file": "optimisation2_result.json",
+      "summary": {
+        "total_cost_eur": 591500000,
+        "budget_limit_eur": 600000000,
+        "total_energy_mwh_per_year": 1059317.9236376267,
+        "total_profit_eur_per_year": 52965896.18188134,
+        "roi_min_years": 9.663925846136866,
+        "roi_max_years": 15.87473827652432
+      }
+    },
+    {
+      "method": "gradient_descent_discrete",
+      "result_file": "optimisation3_result.json",
+      "summary": {
+        "total_cost_eur": 599700000,
+        "budget_limit_eur": 600000000,
+        "total_energy_mwh_per_year": 1137294.638381804,
+        "total_profit_eur_per_year": 56864731.919090204,
+        "roi_min_years": 9.663925846136866,
+        "roi_max_years": 11.734456747253518
+      }
+    }
+  ]
+}

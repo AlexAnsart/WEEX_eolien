@@ -7,13 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from optimisation import (
-    ALLOWED_PARCELS,
     Config,
     ROOT_DIR,
+    TRANSPORT_CONSTRAINTS_PATH,
+    allowed_parcels_for_constraint_set,
     build_options_for_parcel,
     build_parcel_distribution_20y,
     build_wind_aggregated,
     compute_summary,
+    load_transport_constraints,
     load_wind_observations,
     read_turbines,
 )
@@ -42,6 +44,7 @@ def parse_args() -> argparse.Namespace:
 def optimize_global_monte_carlo(
     options_by_parcel: dict[str, list[dict[str, Any]]],
     cfg: Config,
+    parcels: list[str],
     iterations: int,
     seed: int,
 ) -> list[dict[str, Any]]:
@@ -52,7 +55,7 @@ def optimize_global_monte_carlo(
     best_solution: list[dict[str, Any]] = []
 
     for _ in range(max(1, iterations)):
-        order = list(ALLOWED_PARCELS)
+        order = list(parcels)
         rng.shuffle(order)
 
         current_budget = 0
@@ -87,11 +90,23 @@ def optimize_global_monte_carlo(
 def main() -> None:
     args = parse_args()
     cfg = Config(theta_step_deg=args.theta_step)
+    allowed_parcels = allowed_parcels_for_constraint_set(args.constraint_set)
+    transport_constraints, transport_globals = load_transport_constraints(TRANSPORT_CONSTRAINTS_PATH)
+    cfg.transport_steering_angle_deg = float(
+        transport_globals.get("steering_max_angle_deg", cfg.transport_steering_angle_deg)
+    )
+    cfg.transport_max_distance_m = float(
+        transport_globals.get("max_distance_to_site_m", cfg.transport_max_distance_m)
+    )
+    cfg.truck_base_mass_t = float(transport_globals.get("truck_base_mass_t", cfg.truck_base_mass_t))
+    cfg.truck_blade_mass_factor_t_per_m = float(
+        transport_globals.get("truck_blade_mass_factor_t_per_m", cfg.truck_blade_mass_factor_t_per_m)
+    )
 
     turbines = read_turbines(ROOT_DIR / "phase2" / "data" / "turbines.json")
-    yearly_obs = load_wind_observations()
+    yearly_obs = load_wind_observations(allowed_parcels)
     wind_agg = build_wind_aggregated(yearly_obs)
-    parcel_dist_20y = build_parcel_distribution_20y(yearly_obs)
+    parcel_dist_20y = build_parcel_distribution_20y(yearly_obs, allowed_parcels)
 
     options_by_parcel = {
         parcel: build_options_for_parcel(
@@ -99,12 +114,14 @@ def main() -> None:
             parcel_distribution=parcel_dist_20y[parcel],
             turbines=turbines,
             cfg=cfg,
+            transport_constraints=transport_constraints,
         )
-        for parcel in ALLOWED_PARCELS
+        for parcel in allowed_parcels
     }
     placements = optimize_global_monte_carlo(
         options_by_parcel=options_by_parcel,
         cfg=cfg,
+        parcels=allowed_parcels,
         iterations=args.iterations,
         seed=args.seed,
     )
@@ -117,6 +134,7 @@ def main() -> None:
         "placements": placements,
         "meta": {
             "method": "monte_carlo",
+            "allowed_parcels": allowed_parcels,
             "iterations": args.iterations,
             "seed": args.seed,
             "theta_step_deg": cfg.theta_step_deg,

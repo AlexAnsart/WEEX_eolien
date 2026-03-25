@@ -38,6 +38,8 @@ type Placement = {
   cost_total_eur: number;
   roi_years: number;
   feasible: boolean;
+  transport_ok?: boolean;
+  transport_blocker?: string | null;
 };
 
 type OptimisationPayload = {
@@ -50,23 +52,13 @@ type OptimisationPayload = {
     roi_max_years: number | null;
   };
   placements: Placement[];
-};
-
-type MethodSummary = {
-  total_cost_eur: number;
-  budget_limit_eur: number;
-  total_energy_mwh_per_year: number;
-  total_profit_eur_per_year: number;
-  roi_min_years: number | null;
-  roi_max_years: number | null;
-};
-
-type ComparisonPayload = {
-  methods: Array<{
-    method: string;
-    result_file: string;
-    summary: MethodSummary;
-  }>;
+  meta?: {
+    transport_max_distance_m?: number;
+    transport_steering_angle_deg?: number;
+    truck_base_mass_t?: number;
+    truck_blade_mass_factor_t_per_m?: number;
+    notes?: string[];
+  };
 };
 
 const euroFmt = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
@@ -74,7 +66,6 @@ const numFmt = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 
 const Optimisation = () => {
   const [data, setData] = useState<OptimisationPayload | null>(null);
-  const [comparison, setComparison] = useState<ComparisonPayload | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,16 +83,10 @@ const Optimisation = () => {
     setError(null);
     try {
       const ts = Date.now();
-      const [resultRes, comparisonRes] = await Promise.all([
-        fetch(`/generated/optimisation_result.json?t=${ts}`, { cache: "no-store" }),
-        fetch(`/generated/optimisation_comparison.json?t=${ts}`, { cache: "no-store" }),
-      ]);
+      const resultRes = await fetch(`/generated/optimisation_result.json?t=${ts}`, { cache: "no-store" });
       if (!resultRes.ok) throw new Error("Impossible de charger optimisation_result.json");
-      if (!comparisonRes.ok) throw new Error("Impossible de charger optimisation_comparison.json");
       const payload = (await resultRes.json()) as OptimisationPayload;
-      const comparisonPayload = (await comparisonRes.json()) as ComparisonPayload;
       setData(payload);
-      setComparison(comparisonPayload);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -157,37 +142,21 @@ const Optimisation = () => {
 
       {data && (
         <>
-          {comparison && (
-            <div className="glass-card overflow-x-auto p-4">
-              <p className="mb-3 text-sm font-medium">Comparaison des méthodes</p>
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="text-left text-muted-foreground">
-                  <tr>
-                    <th className="py-2">Méthode</th>
-                    <th className="py-2">Budget utilisé (€)</th>
-                    <th className="py-2">Budget max (€)</th>
-                    <th className="py-2">Énergie (MWh/an)</th>
-                    <th className="py-2">Profit net (€/an)</th>
-                    <th className="py-2">ROI min (ans)</th>
-                    <th className="py-2">ROI max (ans)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparison.methods.map((m) => (
-                    <tr key={m.method} className="border-t border-border/60">
-                      <td className="py-2">{m.method}</td>
-                      <td className="py-2">{euroFmt.format(m.summary.total_cost_eur)}</td>
-                      <td className="py-2">{euroFmt.format(m.summary.budget_limit_eur)}</td>
-                      <td className="py-2">{numFmt.format(m.summary.total_energy_mwh_per_year)}</td>
-                      <td className="py-2">{euroFmt.format(m.summary.total_profit_eur_per_year)}</td>
-                      <td className="py-2">{m.summary.roi_min_years?.toFixed(2) ?? "-"}</td>
-                      <td className="py-2">{m.summary.roi_max_years?.toFixed(2) ?? "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="glass-card p-4">
+            <p className="mb-2 text-sm font-medium">Contraintes prises en compte</p>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li>Avifaune (constraint-set 2): exclusion des parcelles protégées.</li>
+              <li>Transport terrestre: accès camion à moins de {data.meta?.transport_max_distance_m ?? 500} m.</li>
+              <li>Rayon de braquage: R = E / sin(a), avec a = {data.meta?.transport_steering_angle_deg ?? 40}°.</li>
+              <li>
+                Ponts: contrôle de masse du convoi (base {data.meta?.truck_base_mass_t ?? 38} t +{" "}
+                {(data.meta?.truck_blade_mass_factor_t_per_m ?? 0.9).toFixed(1)} t/m de pale).
+              </li>
+            </ul>
+            {data.meta?.notes?.length ? (
+              <p className="mt-2 text-xs text-muted-foreground">{data.meta.notes[data.meta.notes.length - 1]}</p>
+            ) : null}
+          </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="glass-card p-4">
@@ -297,6 +266,7 @@ const Optimisation = () => {
                   <th className="py-2">Coût (€)</th>
                   <th className="py-2">Énergie (MWh/an)</th>
                   <th className="py-2">ROI (ans)</th>
+                  <th className="py-2">Transport OK</th>
                   <th className="py-2">Feasible</th>
                 </tr>
               </thead>
@@ -311,6 +281,7 @@ const Optimisation = () => {
                     <td className="py-2">{euroFmt.format(p.cost_total_eur)}</td>
                     <td className="py-2">{numFmt.format(p.energy_mwh_per_year)}</td>
                     <td className="py-2">{p.roi_years.toFixed(2)}</td>
+                    <td className="py-2">{p.transport_ok ?? true ? "Oui" : "Non"}</td>
                     <td className="py-2">{String(p.feasible)}</td>
                   </tr>
                 ))}

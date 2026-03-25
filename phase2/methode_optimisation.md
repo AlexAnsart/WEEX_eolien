@@ -4,7 +4,7 @@ Ce document explique la logique de `phase2/optimisation.py`.
 
 ## 1. But de la méthode
 
-L'objectif est de choisir, pour les 20 parcelles autorisées, une implantation d'éoliennes qui maximise le profit annuel, tout en respectant les contraintes du sujet. Le budget global ne doit pas dépasser 600 M€, le ROI par parcelle doit rester inférieur ou égal à 20 ans, le nombre d'éoliennes par parcelle est limité selon le diamètre de rotor, la compatibilité terre/mer doit être respectée (pas d'offshore sur terre, pas de terrestre en mer), et une seule technologie d'éolienne est autorisée par parcelle.
+L'objectif est de choisir, pour les parcelles autorisées par le `constraint-set`, une implantation d'éoliennes qui maximise le profit annuel, tout en respectant les contraintes du sujet. Le budget global ne doit pas dépasser 600 M€, le ROI par parcelle doit rester inférieur ou égal à 20 ans, le nombre d'éoliennes par parcelle est limité selon le diamètre de rotor, la compatibilité terre/mer doit être respectée (pas d'offshore sur terre, pas de terrestre en mer), et une seule technologie d'éolienne est autorisée par parcelle.
 
 Le script produit principalement deux sorties. La première est `public/generated/optimisation_result.json`, qui contient le résultat final d'optimisation. La seconde est `phase2/data/wind_aggregated.json`, qui conserve les données météo agrégées pour assurer la traçabilité des calculs.
 
@@ -33,6 +33,49 @@ La matrice de capacité (`CAPACITY_BY_PARCEL`) est codée dans le script à part
 ## 3.2 Compatibilité offshore/terrestre
 
 Le script déclare explicitement les parcelles marines (zones bleues): `{"7C", "8C", "8H", "14J", "15J"}`. La règle de compatibilité est ensuite appliquée de façon stricte: une parcelle marine n'accepte que des éoliennes offshore, tandis qu'une parcelle terrestre n'accepte que des éoliennes terrestres.
+
+## 3.3 Contrainte avifaune (Contrainte 1)
+
+Le script gère deux jeux de contraintes via l'argument `--constraint-set`:
+
+- `constraint-set=1`: configuration de base (20 parcelles de la mission 2).
+- `constraint-set=2`: même configuration avec exclusion des parcelles en zone de protection avifaune.
+
+Dans l'implémentation actuelle, les parcelles suivantes sont exclues pour `constraint-set=2` :
+
+- `4E`, `3J`, `16E`, `18F`, `18G`, `18H`
+
+## 3.4 Contrainte transport terrestre (cumulative)
+
+Les parcelles terrestres sont maintenant filtrées par une contrainte d'accessibilité routière, en plus des contraintes existantes.
+
+Les paramètres sont lus dans `phase2/data/transport_constraints.json` et appliqués uniquement aux éoliennes terrestres :
+
+- Distance camion ↔ champ: au moins un accès à moins de `500 m`.
+- Rayon de braquage: on calcule `R = E / sin(a)` avec `a = 40°` et `E = longueur de pale`.
+- Ponts: le poids estimé du convoi doit rester inférieur à la limite de tonnage du pont, si une limite existe.
+
+La longueur de pale est estimée par `D_m / 2` (diamètre rotor / 2), et le poids du convoi est estimé via un modèle simple paramétrable (`base_mass_t` + facteur par mètre de pale) dans le même fichier JSON.
+
+Si une option terrestre ne respecte pas une de ces conditions, elle n'est pas générée dans la liste des options candidates avant l'optimisation globale.
+
+### 3.4.1 Protocole de mesure des cartes transport
+
+Pour rendre la contrainte traçable, les valeurs ne sont plus codées "à la main" directement dans `transport_constraints.json`.
+
+- Les mesures brutes sont centralisées dans `phase2/data/transport_measurements.json`.
+- Chaque map (`MAP_*.png`) possède :
+  - `scale_bar_px` : longueur en pixels de la barre 0-2 km.
+  - par parcelle : `distance_px`, `min_curve_radius_px`, `bridge_limit_t`.
+- La conversion est faite automatiquement par `phase2/build_transport_constraints.py` :
+  - `meter_per_pixel = 2000 / scale_bar_px`
+  - `distance_to_access_road_m = distance_px * meter_per_pixel`
+  - `min_curve_radius_m = min_curve_radius_px * meter_per_pixel`
+- Le script régénère `phase2/data/transport_constraints.json` avec :
+  - les valeurs converties en mètres,
+  - une section `traceability_by_parcel` (map source, échelle, mesures px).
+
+Cette étape permet de justifier chaque valeur de contrainte par la carte d'origine et de recalculer facilement si les mesures sont affinées.
 
 ---
 
@@ -67,7 +110,7 @@ La courbe de puissance est modélisée par morceaux. La puissance est nulle sous
 
 ## 5.3 Effet du nombre d'éoliennes (proxy sillage)
 
-L'effet de sillage est pris en compte via un facteur de perte simplifié: `wake_factor(n) = max(floor, 1 - alpha*(n-1))`, avec `alpha = 0.009` et `floor = 0.70`. L'énergie associée à une option est ensuite calculée par `E_option = n * E_base(theta) * wake_factor(n)`, ce qui reflète à la fois l'augmentation du nombre de turbines et la dégradation progressive du rendement unitaire.
+L'effet de sillage est pris en compte via un facteur de perte simplifié: `wake_factor(n) = max(floor, 1 - alpha*(n-1))`, avec `alpha = 0.0022944` (calibré pour coller au modèle de calcul du site) et `floor = 0.70`. L'énergie associée à une option est ensuite calculée par `E_option = n * E_base(theta) * wake_factor(n)`, ce qui reflète à la fois l'augmentation du nombre de turbines et la dégradation progressive du rendement unitaire.
 
 ---
 
@@ -91,7 +134,7 @@ Dans `optimize_global(...)`, la programmation dynamique maintient un tableau 1D 
 
 Les options traitées pour chaque parcelle sont dans `all_options[parcel]`. Ce dictionnaire est construit en préfixant la liste de candidats par une option “none” de coût total `0` et de profit annuel `0.0`, marquée par `{"none": True}`. Concrètement, cela garantit que la DP peut toujours décider de ne rien prendre pour une parcelle, et que le résultat final respectera “au plus une option par parcelle” (car on choisit une seule option par transition).
 
-La transition DP se fait ensuite en boucles imbriquées. Pour chaque parcelle `i` (ordre donné par `ALLOWED_PARCELS`), on crée un tableau `nxt` initialisé avec `-1e30`. Puis pour chaque indice budget `b`, si `dp[b]` est invalide on passe. Sinon, on teste toutes les options `opt` de `all_options[parcel]`. Pour chaque option, on calcule son coût discrétisé `c` puis le nouvel indice `nb = b + c`. Si `nb` dépasse `budget_steps`, on ignore l’option. Sinon, le profit candidat vaut `v = dp[b] + float(opt["profit_net_eur_per_year"])`. Si `v` améliore la meilleure valeur connue pour `nxt[nb]`, alors `nxt[nb]` est mis à jour, et on mémorise pour cette amélioration `choice[i][nb] = opt_idx` et `previous_budget[i][nb] = b`. Après avoir parcouru toutes les options, on remplace `dp = nxt` et on passe à la parcelle suivante.
+La transition DP se fait ensuite en boucles imbriquées. Pour chaque parcelle `i` (ordre donné par la liste des parcelles autorisées du `constraint-set` actif), on crée un tableau `nxt` initialisé avec `-1e30`. Puis pour chaque indice budget `b`, si `dp[b]` est invalide on passe. Sinon, on teste toutes les options `opt` de `all_options[parcel]`. Pour chaque option, on calcule son coût discrétisé `c` puis le nouvel indice `nb = b + c`. Si `nb` dépasse `budget_steps`, on ignore l’option. Sinon, le profit candidat vaut `v = dp[b] + float(opt["profit_net_eur_per_year"])`. Si `v` améliore la meilleure valeur connue pour `nxt[nb]`, alors `nxt[nb]` est mis à jour, et on mémorise pour cette amélioration `choice[i][nb] = opt_idx` et `previous_budget[i][nb] = b`. Après avoir parcouru toutes les options, on remplace `dp = nxt` et on passe à la parcelle suivante.
 
 Une fois toutes les parcelles traitées, l’algorithme ne force pas l’utilisation du budget maximal: il choisit simplement le budget discrétisé `end_budget` qui maximise `dp[b]` (donc le profit annuel total le plus élevé parmi tous les budgets autorisés par la grille). On récupère alors une solution faisable en reconstruisant le choix optionnel à rebours.
 

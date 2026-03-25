@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "description": "Mesures manuelles relevees sur les cartes phase2/Ressource_transport avec conversion pixel->metre via la barre d'echelle 0-2 km.",
+  "global": {
+    "scale_bar_real_m": 2000.0,
+    "steering_max_angle_deg": 40.0,
+    "max_distance_to_site_m": 500.0,
+    "truck_weight_model": {
+      "base_mass_t": 38.0,
+      "blade_mass_factor_t_per_m": 0.9
+    }
+  },
+  "maps": {
+    "MAP_3H_4H.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "3H": { "distance_px": 13.0, "min_curve_radius_px": 3.8, "bridge_limit_t": null },
+        "4H": { "distance_px": 15.0, "min_curve_radius_px": 3.6, "bridge_limit_t": null }
+      }
+    },
+    "MAP_3J.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "3J": { "distance_px": 16.0, "min_curve_radius_px": 2.0, "bridge_limit_t": null }
+      }
+    },
+    "MAP_4E.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "4E": { "distance_px": 9.0, "min_curve_radius_px": 4.6, "bridge_limit_t": null }
+      }
+    },
+    "MAP_5G_6G.png": {
+      "scale_bar_px": 106.0,
+      "parcels": {
+        "5G": { "distance_px": 18.0, "min_curve_radius_px": 1.9, "bridge_limit_t": null },
+        "6G": { "distance_px": 11.0, "min_curve_radius_px": 3.5, "bridge_limit_t": null }
+      }
+    },
+    "MAP_9E_9F.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "9E": { "distance_px": 22.0, "min_curve_radius_px": 3.0, "bridge_limit_t": null },
+        "9F": { "distance_px": 24.0, "min_curve_radius_px": 2.9, "bridge_limit_t": null }
+      }
+    },
+    "MAP_11E_12E.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "11E": { "distance_px": 15.0, "min_curve_radius_px": 3.3, "bridge_limit_t": 2.5 },
+        "12E": { "distance_px": 16.0, "min_curve_radius_px": 3.3, "bridge_limit_t": 2.5 }
+      }
+    },
+    "MAP_13F.png": {
+      "scale_bar_px": 106.0,
+      "parcels": {
+        "13F": { "distance_px": 9.0, "min_curve_radius_px": 4.8, "bridge_limit_t": null }
+      }
+    },
+    "MAP_16E.png": {
+      "scale_bar_px": 106.0,
+      "parcels": {
+        "16E": { "distance_px": 8.0, "min_curve_radius_px": 4.6, "bridge_limit_t": null }
+      }
+    },
+    "MAP_18F_18G_18H.png": {
+      "scale_bar_px": 104.0,
+      "parcels": {
+        "18F": { "distance_px": 11.0, "min_curve_radius_px": 3.8, "bridge_limit_t": null },
+        "18G": { "distance_px": 18.0, "min_curve_radius_px": 2.3, "bridge_limit_t": null },
+        "18H": { "distance_px": 13.0, "min_curve_radius_px": 2.7, "bridge_limit_t": null }
+      }
+    }
+  }
+}

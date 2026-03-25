@@ -1,0 +1,174 @@
+{
+  "scenario": 1,
+  "constraint_set": 1,
+  "objective_model_version": "phase2_v1_directional_roi_budget_dp",
+  "summary": {
+    "total_cost_eur": 600000000,
+    "budget_limit_eur": 600000000,
+    "total_energy_mwh_per_year": 1242016.1905477126,
+    "total_profit_eur_per_year": 62100809.52738564,
+    "roi_min_years": 8.864283223920367,
+    "roi_max_years": 10.523064141932522
+  },
+  "placements": [
+    {
+      "parcel_id": "8C",
+      "type_id": 3,
+      "install_kind": "offshore",
+      "theta_deg": 330,
+      "n_turbines": 11,
+      "capacity_max": 14,
+      "energy_mwh_per_year": 315687.51793143846,
+      "cost_total_eur": 166100000,
+      "roi_years": 10.523064141932522,
+      "profit_net_eur_per_year": 15784375.896571923,
+      "feasible": true
+    },
+    {
+      "parcel_id": "8H",
+      "type_id": 3,
+      "install_kind": "offshore",
+      "theta_deg": 0,
+      "n_turbines": 13,
+      "capacity_max": 13,
+      "energy_mwh_per_year": 442901.0108122048,
+      "cost_total_eur": 196300000,
+      "roi_years": 8.864283223920367,
+      "profit_net_eur_per_year": 22145050.54061024,
+      "feasible": true
+    },
+    {
+      "parcel_id": "9E",
+      "type_id": 9,
+      "install_kind": "terrestre",
+      "theta_deg": 30,
+      "n_turbines": 19,
+      "capacity_max": 19,
+      "energy_mwh_per_year": 285925.2793159124,
+      "cost_total_eur": 136800000,
+      "roi_years": 9.568933556857893,
+      "profit_net_eur_per_year": 14296263.96579562,
+      "feasible": true
+    },
+    {
+      "parcel_id": "13F",
+      "type_id": 9,
+      "install_kind": "terrestre",
+      "theta_deg": 0,
+      "n_turbines": 14,
+      "capacity_max": 19,
+      "energy_mwh_per_year": 197502.38248815708,
+      "cost_total_eur": 100800000,
+      "roi_years": 10.207471801616805,
+      "profit_net_eur_per_year": 9875119.124407854,
+      "feasible": true
+    }
+  ],
+  "meta": {
+    "allowed_parcels": [
+      "3H",
+      "3J",
+      "4E",
+      "4H",
+      "5G",
+      "6G",
+      "7C",
+      "8C",
+      "8H",
+      "9E",
+      "9F",
+      "11E",
+      "12E",
+      "13F",
+      "14J",
+      "15J",
+      "16E",
+      "18F",
+      "18G",
+      "18H"
+    ],
+    "excluded_parcels_avifaune": [],
+    "theta_step_deg": 30,
+    "buyback_price_eur_per_mwh": 80.0,
+    "maintenance_cost_eur_per_mwh": 30.0,
+    "roi_limit_years": 20.0,
+    "budget_quantization_eur": 100000,
+    "years_used": [
+      "1995",
+      "1996",
+      "1997",
+      "1998",
+      "1999",
+      "2000",
+      "2001",
+      "2002",
+      "2003",
+      "2004",
+      "2005",
+      "2006",
+      "2007",
+      "2008",
+      "2009",
+      "2010",
+      "2011",
+      "2012",
+      "2013",
+      "2014",
+      "2015",
+      "2016",
+      "2017",
+      "2018"
+    ],
+    "notes": [
+      "Capacites parcelles depuis Mission2_pres.pdf (diapo capacite).",
+      "Donnees meteo chargees uniquement depuis phase2/data/Data brut/*.zip.",
+      "Toutes les annees disponibles dans Data brut sont agregees en distribution vent (vitesse+direction) sur 20+ ans.",
+      "Contrainte terrestre/offshore appliquee selon parcelles marines (zones bleues).",
+      "constraint-set=2: parcelles avifaune exclues (Milvus migrans / Falco naumanni).",
+      "Capacite appliquee strictement selon le tableau D=200..30 (sans approximation de diametre).",
+      "Direction penalisee via max(0, cos(delta))^p.",
+      "Les options sont filtrees avec ROI <= 20 ans par parcelle.",
+      "Comparaison en sortie avec Monte-Carlo et descente de gradient discrete."
+    ]
+  },
+  "comparison_methods": {
+    "methods": [
+      {
+        "method": "dynamic_programming",
+        "result_file": "optimisation_result.json",
+        "summary": {
+          "total_cost_eur": 600000000,
+          "budget_limit_eur": 600000000,
+          "total_energy_mwh_per_year": 1242016.1905477126,
+          "total_profit_eur_per_year": 62100809.52738564,
+          "roi_min_years": 8.864283223920367,
+          "roi_max_years": 10.523064141932522
+        }
+      },
+      {
+        "method": "monte_carlo",
+        "result_file": "optimisation2_result.json",
+        "summary": {
+          "total_cost_eur": 597600000,
+          "budget_limit_eur": 600000000,
+          "total_energy_mwh_per_year": 1167168.6449025322,
+          "total_profit_eur_per_year": 58358432.24512661,
+          "roi_min_years": 9.254648332434854,
+          "roi_max_years": 18.033946299595787
+        }
+      },
+      {
+        "method": "gradient_descent_discrete",
+        "result_file": "optimisation3_result.json",
+        "summary": {
+          "total_cost_eur": 598600000,
+          "budget_limit_eur": 600000000,
+          "total_energy_mwh_per_year": 1239858.638914965,
+          "total_profit_eur_per_year": 61992931.94574825,
+          "roi_min_years": 8.864283223920367,
+          "roi_max_years": 10.473872410319045
+        }
+      }
+    ]
+  }
+}

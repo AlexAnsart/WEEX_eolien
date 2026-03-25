@@ -11,7 +11,8 @@ from typing import Any
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-ALLOWED_PARCELS = [
+TRANSPORT_CONSTRAINTS_PATH = ROOT_DIR / "phase2" / "data" / "transport_constraints.json"
+BASE_ALLOWED_PARCELS = [
     "3H",
     "3J",
     "4E",
@@ -33,6 +34,24 @@ ALLOWED_PARCELS = [
     "18G",
     "18H",
 ]
+# Contrainte avifaune (Contrainte 1): les parcelles contenant des
+# zones de protection des especes Milvus migrans / Falco naumanni
+# sont exclues de l'implantation.
+#
+# Note: dans l'interface et la documentation, les parcelles sont representees
+# sous la forme "3H", "4E", etc. Lors de la saisie utilisateur, "E4" est donc
+# interprete comme "4E", etc.
+BIRD_PROTECTION_EXCLUDED_PARCELS = {"4E", "3J", "16E", "18F", "18G", "18H"}
+
+
+def allowed_parcels_for_constraint_set(constraint_set: int) -> list[str]:
+    if constraint_set == 1:
+        return list(BASE_ALLOWED_PARCELS)
+    if constraint_set == 2:
+        return [p for p in BASE_ALLOWED_PARCELS if p not in BIRD_PROTECTION_EXCLUDED_PARCELS]
+    raise ValueError(
+        f"constraint-set={constraint_set} non supporte. Valeurs autorisees: 1 (base), 2 (avec avifaune)."
+    )
 # Parcelles marines (zones bleues de la carte Mission 2).
 # Les autres parcelles autorisees sont considerees terrestres.
 OFFSHORE_PARCELS = {"7C", "8C", "8H", "14J", "15J"}
@@ -70,11 +89,24 @@ class Config:
     roi_limit_years: float = 20.0
     theta_step_deg: int = 30
     direction_penalty_power: float = 1.8
-    wake_loss_alpha: float = 0.009
+    # Calibrage pour coller au modele de calcul du site d'envoi.
+    # (Le reste des parametres wake_loss_floor et wake_factor est conserve.)
+    wake_loss_alpha: float = 0.0022944266238741117
     wake_loss_floor: float = 0.70
     budget_quantization_eur: int = 100_000
     max_options_per_parcel: int = 120
     yearly_aggregation_mode: str = "mean"
+    transport_max_distance_m: float = 500.0
+    transport_steering_angle_deg: float = 40.0
+    truck_base_mass_t: float = 38.0
+    truck_blade_mass_factor_t_per_m: float = 0.9
+
+
+@dataclass
+class ParcelTransportConstraint:
+    distance_to_access_road_m: float
+    min_curve_radius_m: float
+    bridge_limit_t: float | None
 
 
 def parse_args() -> argparse.Namespace:
@@ -91,11 +123,6 @@ def parse_args() -> argparse.Namespace:
         "--wind-output",
         type=Path,
         default=ROOT_DIR / "phase2" / "data" / "wind_aggregated.json",
-    )
-    parser.add_argument(
-        "--compare-output",
-        type=Path,
-        default=ROOT_DIR / "public" / "generated" / "optimisation_comparison.json",
     )
     return parser.parse_args()
 
@@ -122,6 +149,39 @@ def read_turbines(path: Path) -> list[dict[str, Any]]:
     return turbines
 
 
+def load_transport_constraints(
+    path: Path,
+) -> tuple[dict[str, ParcelTransportConstraint], dict[str, float]]:
+    if not path.exists():
+        return {}, {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    parcels_raw = raw.get("parcels", {})
+    constraints: dict[str, ParcelTransportConstraint] = {}
+    for parcel, item in parcels_raw.items():
+        constraints[parcel] = ParcelTransportConstraint(
+            distance_to_access_road_m=float(item["distance_to_access_road_m"]),
+            min_curve_radius_m=float(item["min_curve_radius_m"]),
+            bridge_limit_t=(
+                None if item.get("bridge_limit_t") is None else float(item["bridge_limit_t"])
+            ),
+        )
+    globals_cfg = {
+        "steering_max_angle_deg": float(
+            raw.get("steering_max_angle_deg", Config.transport_steering_angle_deg)
+        ),
+        "max_distance_to_site_m": float(raw.get("max_distance_to_site_m", Config.transport_max_distance_m)),
+        "truck_base_mass_t": float(
+            raw.get("truck_weight_model", {}).get("base_mass_t", Config.truck_base_mass_t)
+        ),
+        "truck_blade_mass_factor_t_per_m": float(
+            raw.get("truck_weight_model", {}).get(
+                "blade_mass_factor_t_per_m", Config.truck_blade_mass_factor_t_per_m
+            )
+        ),
+    }
+    return constraints, globals_cfg
+
+
 def parse_wind_text(raw_text: str) -> list[tuple[float, float]]:
     values: list[tuple[float, float]] = []
     for line in raw_text.splitlines():
@@ -143,7 +203,7 @@ def _normalize_parcel_from_file_id(file_parcel: str) -> str:
     return f"{int(file_parcel[:2])}{file_parcel[2]}"
 
 
-def load_wind_observations() -> dict[str, dict[str, list[tuple[float, float]]]]:
+def load_wind_observations(allowed_parcels: list[str]) -> dict[str, dict[str, list[tuple[float, float]]]]:
     data_brut_dir = ROOT_DIR / "phase2" / "data" / "Data brut"
     if not data_brut_dir.exists():
         raise FileNotFoundError(f"Dossier introuvable: {data_brut_dir}")
@@ -154,7 +214,7 @@ def load_wind_observations() -> dict[str, dict[str, list[tuple[float, float]]]]:
         raise FileNotFoundError(f"Aucun zip trouvé dans: {data_brut_dir}")
 
     txt_pattern = re.compile(r"([0-9]{2}[A-L])_([0-9]{4})\.txt$")
-    allowed_set = set(ALLOWED_PARCELS)
+    allowed_set = set(allowed_parcels)
 
     for zpath in zip_paths:
         with zipfile.ZipFile(zpath, "r") as zf:
@@ -170,12 +230,12 @@ def load_wind_observations() -> dict[str, dict[str, list[tuple[float, float]]]]:
                 obs = parse_wind_text(raw)
                 yearly.setdefault(year, {})[parcel] = obs
 
-    # Validation: chaque année doit contenir les 20 parcelles.
+    # Validation: chaque annee doit contenir toutes les parcelles autorisees.
     years = sorted(yearly.keys())
     if not years:
         raise ValueError("Aucune donnée météo exploitable trouvée dans les zips Data brut.")
     for year in years:
-        missing = sorted(set(ALLOWED_PARCELS) - set(yearly[year].keys()))
+        missing = sorted(set(allowed_parcels) - set(yearly[year].keys()))
         if missing:
             raise ValueError(f"Année {year} incomplète, parcelles manquantes: {missing}")
     return yearly
@@ -210,11 +270,12 @@ def build_wind_aggregated(
 
 
 def build_parcel_distribution_20y(
-    yearly_obs: dict[str, dict[str, list[tuple[float, float]]]]
+    yearly_obs: dict[str, dict[str, list[tuple[float, float]]]],
+    allowed_parcels: list[str],
 ) -> dict[str, list[dict[str, float]]]:
     # Agrégation des observations de toutes les annees dans une distribution (V, dir) par parcelle.
     out: dict[str, list[dict[str, float]]] = {}
-    for parcel in ALLOWED_PARCELS:
+    for parcel in allowed_parcels:
         bins: dict[str, int] = {}
         for year in sorted(yearly_obs.keys()):
             for v, d in yearly_obs[year][parcel]:
@@ -282,6 +343,7 @@ def build_options_for_parcel(
     parcel_distribution: list[dict[str, float]],
     turbines: list[dict[str, Any]],
     cfg: Config,
+    transport_constraints: dict[str, ParcelTransportConstraint],
 ) -> list[dict[str, Any]]:
     options: list[dict[str, Any]] = []
     thetas = list(range(0, 360, cfg.theta_step_deg))
@@ -290,6 +352,30 @@ def build_options_for_parcel(
         if is_offshore_parcel and t["install_kind"] != "offshore":
             continue
         if (not is_offshore_parcel) and t["install_kind"] != "terrestre":
+            continue
+
+        transport_ok = True
+        transport_reason = None
+        if not is_offshore_parcel:
+            c = transport_constraints.get(parcel)
+            if c is None:
+                transport_ok = False
+                transport_reason = "missing_transport_data"
+            else:
+                blade_length_m = float(t["D_m"]) / 2.0
+                steering_angle_rad = math.radians(cfg.transport_steering_angle_deg)
+                required_turn_radius_m = blade_length_m / max(math.sin(steering_angle_rad), 1e-6)
+                estimated_truck_mass_t = cfg.truck_base_mass_t + cfg.truck_blade_mass_factor_t_per_m * blade_length_m
+                if c.distance_to_access_road_m > cfg.transport_max_distance_m:
+                    transport_ok = False
+                    transport_reason = "distance_gt_500m"
+                elif c.min_curve_radius_m < required_turn_radius_m:
+                    transport_ok = False
+                    transport_reason = "turn_radius_insufficient"
+                elif c.bridge_limit_t is not None and c.bridge_limit_t < estimated_truck_mass_t:
+                    transport_ok = False
+                    transport_reason = "bridge_weight_limit"
+        if not transport_ok:
             continue
 
         cap_max = CAPACITY_BY_PARCEL[parcel][t["diameter_class"]]
@@ -331,14 +417,19 @@ def build_options_for_parcel(
                         "roi_years": roi,
                         "profit_net_eur_per_year": annual_profit,
                         "feasible": True,
+                        "transport_ok": transport_ok,
+                        "transport_blocker": transport_reason,
                     }
                 )
     options.sort(key=lambda x: (x["profit_net_eur_per_year"], -x["cost_total_eur"]), reverse=True)
     return options[: cfg.max_options_per_parcel]
 
 
-def optimize_global(options_by_parcel: dict[str, list[dict[str, Any]]], cfg: Config) -> list[dict[str, Any]]:
-    parcels = ALLOWED_PARCELS
+def optimize_global(
+    options_by_parcel: dict[str, list[dict[str, Any]]],
+    cfg: Config,
+    parcels: list[str],
+) -> list[dict[str, Any]]:
     budget_steps = cfg.budget_limit_eur // cfg.budget_quantization_eur
 
     all_options = {
@@ -404,11 +495,23 @@ def compute_summary(placements: list[dict[str, Any]], cfg: Config) -> dict[str, 
 def main() -> None:
     args = parse_args()
     cfg = Config(theta_step_deg=args.theta_step)
+    allowed_parcels = allowed_parcels_for_constraint_set(args.constraint_set)
+    transport_constraints, transport_globals = load_transport_constraints(TRANSPORT_CONSTRAINTS_PATH)
+    cfg.transport_steering_angle_deg = float(
+        transport_globals.get("steering_max_angle_deg", cfg.transport_steering_angle_deg)
+    )
+    cfg.transport_max_distance_m = float(
+        transport_globals.get("max_distance_to_site_m", cfg.transport_max_distance_m)
+    )
+    cfg.truck_base_mass_t = float(transport_globals.get("truck_base_mass_t", cfg.truck_base_mass_t))
+    cfg.truck_blade_mass_factor_t_per_m = float(
+        transport_globals.get("truck_blade_mass_factor_t_per_m", cfg.truck_blade_mass_factor_t_per_m)
+    )
 
     turbines = read_turbines(ROOT_DIR / "phase2" / "data" / "turbines.json")
-    yearly_obs = load_wind_observations()
+    yearly_obs = load_wind_observations(allowed_parcels)
     wind_agg = build_wind_aggregated(yearly_obs)
-    parcel_dist_20y = build_parcel_distribution_20y(yearly_obs)
+    parcel_dist_20y = build_parcel_distribution_20y(yearly_obs, allowed_parcels)
 
     options_by_parcel = {
         parcel: build_options_for_parcel(
@@ -416,42 +519,11 @@ def main() -> None:
             parcel_distribution=parcel_dist_20y[parcel],
             turbines=turbines,
             cfg=cfg,
+            transport_constraints=transport_constraints,
         )
-        for parcel in ALLOWED_PARCELS
+        for parcel in allowed_parcels
     }
-    placements = optimize_global(options_by_parcel, cfg)
-    # Import local pour eviter les imports circulaires quand optimisation.py est
-    # charge depuis optimisation2.py / optimisation3.py.
-    from optimisation2 import optimize_global_monte_carlo
-    from optimisation3 import optimize_global_gradient_descent
-
-    placements_mc = optimize_global_monte_carlo(
-        options_by_parcel=options_by_parcel,
-        cfg=cfg,
-        iterations=4000,
-        seed=42,
-    )
-    placements_gd = optimize_global_gradient_descent(options_by_parcel=options_by_parcel, cfg=cfg)
-
-    compare = {
-        "methods": [
-            {
-                "method": "dynamic_programming",
-                "result_file": "optimisation_result.json",
-                "summary": compute_summary(placements, cfg),
-            },
-            {
-                "method": "monte_carlo",
-                "result_file": "optimisation2_result.json",
-                "summary": compute_summary(placements_mc, cfg),
-            },
-            {
-                "method": "gradient_descent_discrete",
-                "result_file": "optimisation3_result.json",
-                "summary": compute_summary(placements_gd, cfg),
-            },
-        ]
-    }
+    placements = optimize_global(options_by_parcel, cfg, parcels=allowed_parcels)
 
     result = {
         "scenario": args.scenario,
@@ -460,38 +532,46 @@ def main() -> None:
         "summary": compute_summary(placements, cfg),
         "placements": placements,
         "meta": {
+            "allowed_parcels": allowed_parcels,
+            "excluded_parcels_avifaune": sorted(BIRD_PROTECTION_EXCLUDED_PARCELS)
+            if args.constraint_set == 2
+            else [],
             "theta_step_deg": cfg.theta_step_deg,
             "buyback_price_eur_per_mwh": cfg.buyback_price_eur_per_mwh,
             "maintenance_cost_eur_per_mwh": cfg.maintenance_cost_eur_per_mwh,
             "roi_limit_years": cfg.roi_limit_years,
             "budget_quantization_eur": cfg.budget_quantization_eur,
             "years_used": sorted(yearly_obs.keys()),
+            "transport_constraints_file": str(TRANSPORT_CONSTRAINTS_PATH),
+            "transport_max_distance_m": cfg.transport_max_distance_m,
+            "transport_steering_angle_deg": cfg.transport_steering_angle_deg,
+            "truck_base_mass_t": cfg.truck_base_mass_t,
+            "truck_blade_mass_factor_t_per_m": cfg.truck_blade_mass_factor_t_per_m,
             "notes": [
                 "Capacites parcelles depuis Mission2_pres.pdf (diapo capacite).",
                 "Donnees meteo chargees uniquement depuis phase2/data/Data brut/*.zip.",
                 "Toutes les annees disponibles dans Data brut sont agregees en distribution vent (vitesse+direction) sur 20+ ans.",
                 "Contrainte terrestre/offshore appliquee selon parcelles marines (zones bleues).",
+                "constraint-set=2: parcelles avifaune exclues (Milvus migrans / Falco naumanni).",
+                "Contrainte transport terrestre appliquee: distance <= 500m, rayon de braquage, limite de pont.",
                 "Capacite appliquee strictement selon le tableau D=200..30 (sans approximation de diametre).",
                 "Direction penalisee via max(0, cos(delta))^p.",
+                "Pertes de sillage calibrees pour coller au modele du site: wake_loss_alpha.",
                 "Les options sont filtrees avec ROI <= 20 ans par parcelle.",
-                "Comparaison en sortie avec Monte-Carlo et descente de gradient discrete.",
+                "Optimisation globale resolue par programmation dynamique (sans comparaison inter-methodes).",
             ],
         },
-        "comparison_methods": compare,
     }
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.wind_output.parent.mkdir(parents=True, exist_ok=True)
-    args.compare_output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     args.wind_output.write_text(json.dumps(wind_agg, ensure_ascii=False, indent=2), encoding="utf-8")
-    args.compare_output.write_text(json.dumps(compare, ensure_ascii=False, indent=2), encoding="utf-8")
     print(
         json.dumps(
             {
                 "output": str(args.output),
                 "wind_output": str(args.wind_output),
-                "compare_output": str(args.compare_output),
                 "placements": len(placements),
                 "total_profit_eur_per_year": result["summary"]["total_profit_eur_per_year"],
             }
