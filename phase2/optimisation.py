@@ -12,6 +12,8 @@ from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 TRANSPORT_CONSTRAINTS_PATH = ROOT_DIR / "phase2" / "data" / "transport_constraints.json"
+NEODYMIUM_PRICE_INCREASE_TURBINE_IDS = {1, 4, 7, 10, 12, 14, 18, 20, 21}
+NEODYMIUM_PRICE_MULTIPLIER = 1.10
 BASE_ALLOWED_PARCELS = [
     "3H",
     "3J",
@@ -145,6 +147,10 @@ def diameter_class_strict(d_m: float) -> int:
 def read_turbines(path: Path) -> list[dict[str, Any]]:
     turbines = json.loads(path.read_text(encoding="utf-8"))
     for t in turbines:
+        base_price = int(t["price_eur"])
+        t["base_price_eur"] = base_price
+        if int(t["id"]) in NEODYMIUM_PRICE_INCREASE_TURBINE_IDS:
+            t["price_eur"] = int(round(base_price * NEODYMIUM_PRICE_MULTIPLIER))
         t["diameter_class"] = diameter_class_strict(float(t["D_m"]))
     return turbines
 
@@ -547,6 +553,8 @@ def main() -> None:
             "transport_steering_angle_deg": cfg.transport_steering_angle_deg,
             "truck_base_mass_t": cfg.truck_base_mass_t,
             "truck_blade_mass_factor_t_per_m": cfg.truck_blade_mass_factor_t_per_m,
+            "neodymium_price_multiplier": NEODYMIUM_PRICE_MULTIPLIER,
+            "neodymium_price_impacted_turbine_ids": sorted(NEODYMIUM_PRICE_INCREASE_TURBINE_IDS),
             "notes": [
                 "Capacites parcelles depuis Mission2_pres.pdf (diapo capacite).",
                 "Donnees meteo chargees uniquement depuis phase2/data/Data brut/*.zip.",
@@ -554,6 +562,7 @@ def main() -> None:
                 "Contrainte terrestre/offshore appliquee selon parcelles marines (zones bleues).",
                 "constraint-set=2: parcelles avifaune exclues (Milvus migrans / Falco naumanni).",
                 "Contrainte transport terrestre appliquee: distance <= 500m, rayon de braquage, limite de pont.",
+                "Hausse de +10% appliquee aux turbines a aimants permanents: 1,4,7,10,12,14,18,20,21.",
                 "Capacite appliquee strictement selon le tableau D=200..30 (sans approximation de diametre).",
                 "Direction penalisee via max(0, cos(delta))^p.",
                 "Pertes de sillage calibrees pour coller au modele du site: wake_loss_alpha.",

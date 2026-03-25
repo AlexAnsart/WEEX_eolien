@@ -57,6 +57,8 @@ type OptimisationPayload = {
     transport_steering_angle_deg?: number;
     truck_base_mass_t?: number;
     truck_blade_mass_factor_t_per_m?: number;
+    neodymium_price_multiplier?: number;
+    neodymium_price_impacted_turbine_ids?: number[];
     notes?: string[];
   };
 };
@@ -151,6 +153,10 @@ const Optimisation = () => {
               <li>
                 Ponts: contrôle de masse du convoi (base {data.meta?.truck_base_mass_t ?? 38} t +{" "}
                 {(data.meta?.truck_blade_mass_factor_t_per_m ?? 0.9).toFixed(1)} t/m de pale).
+              </li>
+              <li>
+                Néodyme: +{Math.round(((data.meta?.neodymium_price_multiplier ?? 1.1) - 1) * 100)}% sur les turbines à
+                aimants permanents ({(data.meta?.neodymium_price_impacted_turbine_ids ?? [1, 4, 7, 10, 12, 14, 18, 20, 21]).join(", ")}).
               </li>
             </ul>
             {data.meta?.notes?.length ? (
