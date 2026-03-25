@@ -9,6 +9,7 @@ import Home from "@/pages/Home";
 import AnalyseEolienne from "@/pages/AnalyseEolienne";
 import AnalyseMeteo from "@/pages/AnalyseMeteo";
 import ReportEditorEolien from "@/pages/ReportEditorEolien";
+import Optimisation from "@/pages/Optimisation";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
               <Route path="/" element={<Home />} />
               <Route path="/analyse" element={<AnalyseEolienne />} />
               <Route path="/analyse-meteo" element={<AnalyseMeteo />} />
+              <Route path="/optimisation" element={<Optimisation />} />
               <Route path="/rapport/eolien" element={<ReportEditorEolien />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

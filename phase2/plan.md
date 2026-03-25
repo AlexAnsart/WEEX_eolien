@@ -17,6 +17,7 @@ Contraintes principales (à respecter à la soumission/au calcul) :
   - `3H, 3J, 4E, 4H, 5G, 6G, 7C, 8C, 8H, 9E, 9F, 11E, 12E, 13F, 14J, 15J, 16E, 18F, 18G, 18H`
 - Capacité max d’éoliennes par parcelle dépend du diamètre rotor `D` (table fournie dans le PDF avec colonnes `D=200,150,135,120,110,80,60,50,30`).
 - Sur une parcelle : uniquement `1` type d’éolienne.
+- Compatibilité carte terre/mer : une parcelle terrestre n’accepte que des éoliennes `terrestre`, une parcelle maritime (zones bleues) n’accepte que des éoliennes `offshore`.
 - Direction d’implantation : angle `0..359°`. La direction correspond à “où va le vent”.
 - La direction influence la production (si désalignement, production plus faible).
 - ROI par parcelle <= `20 ans`, avec formule donnée dans le PDF.
@@ -99,14 +100,15 @@ But : pour chaque année météo et chaque parcelle autorisée, obtenir :
 
 Chargement :
 
-- Implémenter un loader générique qui lit les fichiers `.txt` du format exemple `docs/archive/Exemple_résolution/YYYY/<PARCEL>_YYYY.txt`.
+- Implémenter un loader générique qui lit les fichiers `.txt` contenus dans les archives `phase2/data/Data brut/Groupe*.zip` (structure attendue `.../YYYY/<PARCEL>_YYYY.txt`).
 - On agrège ensuite vers une distribution par bin :
   - vitesse : bins de `0.5 m/s` ou `1 m/s` (au choix selon précision)
   - direction : secteurs de `30°` (N, NNE, …) ou angle fin si on veut optimiser l’orientation plus finement.
+- L’optimisation doit utiliser la distribution agrégée sur l’ensemble des années disponibles (pas seulement une année).
 
 Sortie :
 
-- `phase2/data/wind_aggregated.json` (parcelles × années × bins (V,dir) → probabilité/compte).
+- `phase2/data/wind_aggregated.json` (parcelles × années × bins (V,dir) → probabilité/compte), construit uniquement depuis `phase2/data/Data brut`.
 
 ## 4) Modèle de production (P pour une éolienne sur une parcelle)
 
@@ -371,7 +373,8 @@ Tests UI (si le projet a déjà une infra) :
 ## 11) Milestones (ordre d’implémentation conseillé)
 
 1. Écrire `phase2/data/turbines.json` (au minimum : `D`, `prix`, `install_kind`, et un `P(V)` exploitable).
-2. Écrire loader météo et créer `phase2/data/wind_aggregated.json` pour au moins une année de test (2008) puis généraliser.
+2. Écrire loader météo multi-années depuis `phase2/data/Data brut/Groupe*.zip` et créer `phase2/data/wind_aggregated.json` sur l'ensemble des années disponibles.
+   - Utiliser ensuite cette distribution multi-années dans le calcul de production.
 3. Implémenter `phase2/optimisation.py` avec :
   - modèle production + ROI + budget,
   - génération d’options,

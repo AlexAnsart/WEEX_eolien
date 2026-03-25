@@ -92,3 +92,44 @@ def generate_eolien_report(payload: EolienReportPayload) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.post("/api/optimisation/run")
+def run_optimisation(scenario: int = 1, constraint_set: int = 1, theta_step: int = 30) -> dict[str, Any]:
+    script_path = ROOT_DIR / "phase2" / "optimisation.py"
+    output_path = ROOT_DIR / "public" / "generated" / "optimisation_result.json"
+    wind_output_path = ROOT_DIR / "phase2" / "data" / "wind_aggregated.json"
+    cmd = [
+        sys.executable,
+        str(script_path),
+        "--scenario",
+        str(scenario),
+        "--constraint-set",
+        str(constraint_set),
+        "--theta-step",
+        str(theta_step),
+        "--output",
+        str(output_path),
+        "--wind-output",
+        str(wind_output_path),
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    payload = json.loads(result.stdout.strip() or "{}")
+    return {
+        "sourceScript": "phase2/optimisation.py",
+        "resultPath": "public/generated/optimisation_result.json",
+        "windPath": "phase2/data/wind_aggregated.json",
+        "run": payload,
+    }
+
+
+@app.get("/api/optimisation/result")
+def get_optimisation_result() -> dict[str, Any]:
+    result_path = ROOT_DIR / "public" / "generated" / "optimisation_result.json"
+    if not result_path.exists():
+        return {
+            "error": "optimisation_result.json introuvable. Lancez d'abord POST /api/optimisation/run.",
+            "resultPath": "public/generated/optimisation_result.json",
+        }
+    return json.loads(result_path.read_text(encoding="utf-8"))

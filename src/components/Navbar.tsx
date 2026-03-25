@@ -6,6 +6,7 @@ const links = [
   { to: "/analyse", label: "Analyse éolienne" },
   { to: "/analyse-meteo", label: "Analyse météo" },
   { to: "/rapport/eolien", label: "Rapport" },
+  { to: "/optimisation", label: "Optimisation" },
 ];
 
 const Navbar = () => (
